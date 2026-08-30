@@ -1,0 +1,12 @@
+# ---- Milestone 1 dependencies (actually used right now) ----
+pandas>=2.0.0
+numpy>=1.24.0
+pytest>=7.4.0
+python-dotenv>=1.0.0   # loads ai/.env / root .env for local secrets, optional but recommended
+
+# ---- Anticipated Milestone 2+ dependencies (NOT installed/used yet) ----
+# Uncomment when Milestone 2 actually starts implementing these.
+# sentence-transformers   # for embedding-based theme clustering
+# scikit-learn            # for clustering (e.g. KMeans/HDBSCAN) and baseline ML
+# openai                  # if using OpenAI's API for LLM summarization
+# google-generativeai     # if using Gemini instead
