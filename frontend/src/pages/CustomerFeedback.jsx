@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function CustomerFeedback() {
   const navigate = useNavigate();
@@ -26,20 +27,27 @@ function CustomerFeedback() {
     setFile(null);
   };
 
-  const handleAnalyze = () => {
-    // Backend / AI integration will be added later.
-    console.log("Feedback:", feedback);
-    console.log("File:", file);
+  const handleAnalyze = async () => {
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:8000/feedback/",
+        {
+          feedback_text: feedback,
+        }
+      );
 
-    navigate("/insights");
+      console.log("Backend response:", response.data);
+
+      navigate("/insights");
+    } catch (error) {
+      console.error("Error sending feedback:", error);
+    }
   };
 
   return (
     <div className="mx-auto max-w-7xl">
 
-      {/* =========================================
-          PAGE HEADER
-      ========================================== */}
+      {/* PAGE HEADER */}
 
       <div className="mb-8">
 
@@ -58,16 +66,11 @@ function CustomerFeedback() {
 
       </div>
 
-
-      {/* =========================================
-          FEEDBACK INPUT
-      ========================================== */}
+      {/* FEEDBACK INPUT */}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-        {/* =======================================
-            TEXT FEEDBACK
-        ======================================== */}
+        {/* TEXT FEEDBACK */}
 
         <div className="rounded-lg border border-slate-200 bg-white lg:col-span-2">
 
@@ -94,7 +97,6 @@ function CustomerFeedback() {
             </div>
 
           </div>
-
 
           <div className="p-5">
 
@@ -130,10 +132,7 @@ function CustomerFeedback() {
 
         </div>
 
-
-        {/* =======================================
-            FILE UPLOAD
-        ======================================== */}
+        {/* FILE UPLOAD */}
 
         <div className="rounded-lg border border-slate-200 bg-white">
 
@@ -148,7 +147,6 @@ function CustomerFeedback() {
             </p>
 
           </div>
-
 
           <div className="p-5">
 
@@ -182,9 +180,6 @@ function CustomerFeedback() {
               />
 
             </label>
-
-
-            {/* Selected file */}
 
             {file && (
               <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3">
@@ -226,10 +221,7 @@ function CustomerFeedback() {
 
       </div>
 
-
-      {/* =========================================
-          ANALYSIS ACTION
-      ========================================== */}
+      {/* ANALYSIS ACTION */}
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-white">
 
@@ -248,11 +240,10 @@ function CustomerFeedback() {
 
           </div>
 
-
           <button
             type="button"
             onClick={handleAnalyze}
-            disabled={!feedback.trim() && !file}
+            disabled={!feedback.trim()}
             className="inline-flex w-fit items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Analyze with AI
@@ -263,10 +254,7 @@ function CustomerFeedback() {
 
       </div>
 
-
-      {/* =========================================
-          INFORMATION
-      ========================================== */}
+      {/* INFORMATION */}
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
 
@@ -294,11 +282,6 @@ function CustomerFeedback() {
   );
 }
 
-
-/* =========================================
-   INFORMATION CARD
-========================================= */
-
 function InfoCard({
   number,
   title,
@@ -324,3 +307,4 @@ function InfoCard({
 }
 
 export default CustomerFeedback;
+
