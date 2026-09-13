@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from backend.schemas.feedback import CustomerFeedback, FeedbackResponse
 from backend.services.feedback_service import process_feedback
@@ -10,7 +10,15 @@ feedback_router = APIRouter(
 )
 
 
-@feedback_router.post("/", response_model=FeedbackResponse)
+@feedback_router.post(
+    "/",
+    response_model=FeedbackResponse,
+    responses={
+        400: {
+            "description": "Feedback rejected during preprocessing"
+        }
+    }
+)
 async def receive_feedback(feedback: CustomerFeedback):
 
     result = await process_feedback(
@@ -20,6 +28,12 @@ async def receive_feedback(feedback: CustomerFeedback):
         product_area=feedback.product_area,
         language=feedback.language,
     )
+
+    if result["status"] == "rejected":
+        raise HTTPException(
+            status_code=400,
+            detail="Feedback was rejected during preprocessing."
+        )
 
     return {
         "feedback_id": result["feedback_id"],
