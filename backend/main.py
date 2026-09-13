@@ -1,33 +1,38 @@
-from backend.routers.insights import insights_router
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers.feedback import feedback_router
+from backend.routers.insights import insights_router
 from database.connection import (
     connect_to_mongodb,
     close_mongodb_connection,
+    get_database,
 )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Connect to MongoDB when FastAPI starts
-    await connect_to_mongodb()
-    print("MongoDB connected to FastAPI")
+    try:
+        await connect_to_mongodb()
+        print("MongoDB connected to FastAPI")
+    except Exception as error:
+        print(f"MongoDB connection unavailable: {error}")
 
     yield
 
-    # Close MongoDB connection when FastAPI stops
     await close_mongodb_connection()
     print("MongoDB connection closed")
 
 
 app = FastAPI(
     title="Product Feedback Intelligence API",
-    description="Backend service for analysing customer feedback and supporting product planning.",
-    version="0.1.0",
+    description=(
+        "Backend service for analysing customer feedback "
+        "and supporting product planning."
+    ),
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -52,13 +57,20 @@ app.include_router(insights_router)
 def home():
     return {
         "message": "Product Feedback Intelligence API is running",
-        "status": "active"
+        "status": "active",
     }
 
 
 @app.get("/health")
 def health_check():
+    try:
+        get_database()
+        database_status = "connected"
+    except RuntimeError:
+        database_status = "unavailable"
+
     return {
         "service": "backend",
-        "status": "healthy"
+        "status": "healthy",
+        "database_status": database_status,
     }
