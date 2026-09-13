@@ -1,3 +1,4 @@
+from backend.routers.insights import insights_router
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -44,6 +45,7 @@ app.add_middleware(
 
 
 app.include_router(feedback_router)
+app.include_router(insights_router)
 
 
 @app.get("/")

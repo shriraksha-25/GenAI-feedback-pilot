@@ -13,10 +13,18 @@ feedback_router = APIRouter(
 @feedback_router.post("/", response_model=FeedbackResponse)
 async def receive_feedback(feedback: CustomerFeedback):
 
-    result = await process_feedback(feedback.feedback_text)
+    result = await process_feedback(
+        feedback_text=feedback.feedback_text,
+        source=feedback.source,
+        customer_segment=feedback.customer_segment,
+        product_area=feedback.product_area,
+        language=feedback.language,
+    )
 
     return {
-        "message": "Customer feedback received successfully",
+        "feedback_id": result["feedback_id"],
+        "message": "Customer feedback received and analysed successfully",
         "feedback_text": result["feedback_text"],
-        "status": result["status"]
+        "status": result["status"],
+        "ai_analysis": result["ai_analysis"],
     }

@@ -30,7 +30,17 @@ class CustomerFeedback(BaseModel):
     )
 
 
+class AIAnalysisResponse(BaseModel):
+    sentiment: Optional[str] = None
+    category: Optional[str] = None
+    theme: Optional[str] = None
+    pain_point: Optional[str] = None
+    feature_opportunity: Optional[str] = None
+
+
 class FeedbackResponse(BaseModel):
+    feedback_id: str
     message: str
     feedback_text: str
     status: str
+    ai_analysis: AIAnalysisResponse
