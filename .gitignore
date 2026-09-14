@@ -1,0 +1,42 @@
+# ===== Python (AI module, and backend once it exists) =====
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ===== Secrets =====
+.env
+# .env.example is intentionally NOT ignored — it must be committed.
+
+# ===== IDE / OS =====
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ===== AI module datasets =====
+# Raw Kaggle CSV and generated outputs are not committed — they're
+# either large/redistributable-questionable (raw) or fully
+# regenerable by running the pipeline (processed). The small
+# ai/data/sample/ folder IS committed (see .gitignore exceptions
+# below) since it's synthetic data meant to ship with the repo.
+ai/data/raw/*.csv
+ai/data/processed/*.csv
+ai/data/processed/*.json
+!ai/data/raw/.gitkeep
+!ai/data/processed/.gitkeep
+
+# ===== Node / React (frontend teammate, once that folder is used) =====
+frontend/node_modules/
+frontend/build/
+frontend/.env
+
+# ===== Do NOT ignore =====
+# Source code, requirements.txt, and README.md files are never
+# ignored by any rule above — double check before adding new rules
+# that they don't accidentally match those.

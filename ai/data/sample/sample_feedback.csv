@@ -1,0 +1,10 @@
+Ticket ID,Customer Name,Customer Email,Product Purchased,Date of Purchase,Ticket Type,Ticket Subject,Ticket Description,Ticket Status,Resolution,Ticket Priority,Ticket Channel,Customer Satisfaction Rating
+1,Aisha Rao,aisha@example.com,SmartHome Hub,2024-01-05,Technical issue,App keeps crashing,"The app keeps crashing every time I try to open the camera feed, very frustrating.",Closed,Reinstalled app,High,Email,2
+2,Rohit Mehta,rohit@example.com,SmartHome Hub,2024-01-05,Technical issue,App keeps crashing,"The app keeps crashing every time I try to open the camera feed, very frustrating.",Closed,Reinstalled app,High,Chat,3
+3,Sana Iyer,sana@example.com,Wireless Earbuds,2024-01-06,Billing question,Charged twice,"I was charged twice for the same order this month, please refund one charge.",Open,,Medium,Phone,
+4,,,,,,,,,,,,
+5,David Kumar,david@example.com,Wireless Earbuds,2024-01-07,Feature request,Add offline mode,"It would be great if the earbuds app worked offline without needing wifi every time.",Closed,Forwarded to product team,Low,Email,4
+5,David Kumar,david@example.com,Wireless Earbuds,2024-01-07,Feature request,Add offline mode,"It would be great if the earbuds app worked offline without needing wifi every time.",Closed,Forwarded to product team,Low,Email,4
+6,Meera Nair,meera@example.com,SmartHome Hub,2024-01-08,Technical issue,Device wont connect,na,Closed,,Medium,Chat,1
+7,John Paul,john@example.com,Robot Vacuum,2024-01-09,Complaint,Terrible battery life,"Battery drains within 20 minutes of use, unusable for our apartment size.",Open,,High,Email,
+8,Fatima Sheikh,fatima@example.com,Robot Vacuum,2024-01-09,Technical issue,-,-,Closed,,Low,Phone,2
