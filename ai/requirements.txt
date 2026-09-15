@@ -1,6 +1,6 @@
 # ---- Milestone 1 dependencies (data cleaning) ----
 pandas>=2.0.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.5
 pytest>=7.4.0
 python-dotenv>=1.0.0   # loads ai/.env / root .env for local secrets
 
