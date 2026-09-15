@@ -1,12 +1,19 @@
-# ---- Milestone 1 dependencies (actually used right now) ----
+# ---- Milestone 1 dependencies (data cleaning) ----
 pandas>=2.0.0
 numpy>=1.24.0
 pytest>=7.4.0
-python-dotenv>=1.0.0   # loads ai/.env / root .env for local secrets, optional but recommended
+python-dotenv>=1.0.0   # loads ai/.env / root .env for local secrets
 
-# ---- Anticipated Milestone 2+ dependencies (NOT installed/used yet) ----
-# Uncomment when Milestone 2 actually starts implementing these.
-# sentence-transformers   # for embedding-based theme clustering
-# scikit-learn            # for clustering (e.g. KMeans/HDBSCAN) and baseline ML
-# openai                  # if using OpenAI's API for LLM summarization
-# google-generativeai     # if using Gemini instead
+# ---- Milestone 2 dependencies (AI/GenAI agentic layer) ----
+crewai>=1.15.0          # agents, tasks, crew orchestration (Theme / Pain Point / Feature Request agents)
+pydantic>=2.0.0         # structured per-agent output (crewai's output_pydantic); already a crewai dependency, pinned explicitly since ai/agents/schemas.py imports it directly
+scikit-learn>=1.3.0     # TF-IDF + agglomerative clustering for feature-request grouping (ai/services/feature_clustering.py) — no model download required, unlike sentence-transformers
+
+# GenAI provider SDK — install ONE based on which key you configure in .env:
+#   OPENAI_API_KEY set  -> no extra install needed (OpenAI is crewai's base/native provider)
+#   GEMINI_API_KEY set  -> pip install "crewai[google-genai]"   (adds Gemini's native provider support)
+# See ai/README.md "Milestone 2 setup" and ai/agents/llm.py for exact provider selection logic.
+
+# ---- Anticipated Milestone 3+ dependencies (NOT installed/used yet) ----
+# Uncomment when a later milestone actually implements these.
+# sentence-transformers   # optional upgrade path for feature_clustering.py if TF-IDF grouping proves too coarse

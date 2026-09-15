@@ -14,12 +14,17 @@ ai/
 │   └── config.py            # paths, env vars, column mapping — single source of truth
 ├── schemas/
 │   └── feedback.py          # canonical FeedbackRecord / AIAnalysis shape
+├── agents/                  # ★ NEW — Milestone 2 CrewAI agentic layer
+│   ├── schemas.py           # per-agent structured output (pydantic, required by crewai)
+│   ├── llm.py                # GenAI provider selection (OpenAI/Gemini), from env vars only
+│   └── crew.py                # the 3 agents + tasks + crew orchestration
 ├── preprocessing/
 │   └── cleaning.py          # small, testable cleaning functions
 ├── pipeline/
 │   └── feedback_pipeline.py # batch: clean a whole CSV, offline/dev tool
 ├── services/
-│   └── feedback_analyzer.py # ★ PUBLIC INTERFACE — what the backend imports
+│   ├── feedback_analyzer.py # ★ PUBLIC INTERFACE — what the backend imports
+│   └── feature_clustering.py # ★ NEW — batch grouping of similar feature requests
 ├── analysis/
 │   └── dataset_analysis.py  # look-only dataset inspection
 ├── data/
@@ -28,18 +33,22 @@ ai/
 │   └── sample/    # small SYNTHETIC sample_feedback.csv (committed)
 ├── tests/
 │   ├── test_preprocessing.py
-│   ├── test_feedback_analyzer.py
-│   └── test_pipeline.py
+│   ├── test_feedback_analyzer.py       # Milestone 1: text cleaning/validation only
+│   ├── test_feedback_analyzer_ai.py    # Milestone 2: AI-augmentation behavior
+│   ├── test_pipeline.py
+│   ├── test_agent_schemas.py           # Milestone 2
+│   ├── test_crew.py                    # Milestone 2
+│   └── test_feature_clustering.py      # Milestone 2
 └── requirements.txt
 ```
 
 **Why this shape?** `services/` is the only folder a teammate outside
 this module should ever import from — it's the "front door." Everything
-else (`preprocessing`, `pipeline`, `analysis`, `config`) is an
-implementation detail `services/feedback_analyzer.py` builds on, but
-none of it is exposed directly. This is a standard layered design:
-interface layer (`services/`) on top of logic layers (`preprocessing/`,
-`pipeline/`) on top of configuration (`config/`, `schemas/`).
+else (`preprocessing`, `pipeline`, `analysis`, `config`, `agents`) is an
+implementation detail `services/` builds on, but none of it is exposed
+directly. `agents/` follows the same pattern one level in: only
+`services/feedback_analyzer.py` and `services/feature_clustering.py`
+import from it — the backend never imports `ai.agents` directly.
 
 ## Two very different ways this module gets used
 
@@ -152,10 +161,13 @@ Three layers, never mixed:
 - **Raw** — whatever Kaggle calls a column. Only `config.COLUMN_MAP`
   and `analysis/dataset_analysis.py` reference these.
 - **Normalized** — our stable names, used everywhere else.
-- **AI-generated** — `sentiment`, `category`, `theme`, `pain_point`,
-  `feature_opportunity`. Always `None` until Milestone 2+.
+- **AI-generated** — `sentiment`, `category` (always `None` — not in
+  scope, see below), `theme`, `pain_point`, `feature_opportunity`,
+  `feature_category`, `feature_opportunity_group`, `confidence`
+  (populated as of Milestone 2 — see "Milestone 2" section below for
+  exactly when each is populated vs. `None`).
 
-## Initial AI approach
+## Initial AI approach (Milestone 1 analysis)
 
 | Approach | Difficulty | Explainability | Dev time | Cost | Verdict |
 |---|---|---|---|---|---|
@@ -164,13 +176,70 @@ Three layers, never mixed:
 | Fine-tuned transformer | High | Medium | High | Needs GPU/data | Overkill for this timeline |
 | LLM/API-based | Low–Medium | Medium | Low | Pay-per-call | Strong at open-ended extraction |
 | Embeddings + clustering | Medium | Medium | Medium | Low | Great for discovering themes without labels |
-| **Hybrid (embeddings+clustering for themes, LLM to summarize each cluster)** | Medium | Medium–High | Medium | Low–Medium | **Recommended** |
+| **Hybrid (LLM agents per-record, embeddings+clustering for cross-record grouping)** | Medium | Medium–High | Medium | Low–Medium | **Chosen — see Milestone 2 below** |
 
 We don't have labeled training data and can't realistically train a
-model from scratch in this timeline, so the hybrid approach — cluster
-first (no labels needed), then use an LLM to turn each cluster into a
-readable pain point / feature opportunity / sentiment — is the
-practical choice.
+model from scratch in this timeline, so the hybrid approach — LLM
+agents extract structured signal from each piece of feedback
+individually, then embeddings + clustering group similar feature
+requests across many records — is what Milestone 2 actually
+implements below.
+
+## Milestone 2 — AI/GenAI Agentic Layer (implemented)
+
+Three CrewAI agents, run sequentially per piece of feedback, each
+producing a validated structured (pydantic) output — see
+`ai/agents/crew.py` and `ai/agents/schemas.py`:
+
+| Agent | Role | Output |
+|---|---|---|
+| **Theme Extraction Agent** | Identify the main topic | `theme` (short label) + `confidence` |
+| **Customer Pain Point Agent** | State the concrete problem/friction | `pain_point` (one sentence) + `confidence` |
+| **Feature Request Agent** | Detect + categorize feature requests, honestly reporting when there isn't one | `feature_request`, `feature_category`, `confidence` |
+
+**Feature request clustering** (grouping "Add UPI payments" / "Support
+Google Pay" / "Give us more payment options" into one opportunity) is
+a **separate batch function**, not a fourth agent — see
+`ai/services/feature_clustering.py` and
+`../docs/AI_INTEGRATION.md` section 4b for why and how to call it.
+
+**GenAI provider**: configurable via `OPENAI_API_KEY` / `GEMINI_API_KEY`
+in `.env` (see "Milestone 2 setup" below) — recommended is Gemini
+(free tier), OpenAI works as a drop-in alternative. Neither key is
+hardcoded anywhere; `ai/agents/llm.py` is the only place provider
+selection happens.
+
+**Sentiment analysis and generic `category` classification are
+explicitly NOT part of this Milestone 2 scope** (per the project
+brief — only the three agents above). Both schema fields remain
+`None`; nothing in this codebase invents a value for them.
+
+### Milestone 2 setup
+
+1. Get a free Gemini API key: https://aistudio.google.com/apikey
+   (or use an existing OpenAI key if you have one).
+2. `cp .env.example .env` (Windows: `copy .env.example .env`) if you
+   haven't already, then fill in `GEMINI_API_KEY=...` (or
+   `OPENAI_API_KEY=...`).
+3. Install the Milestone 2 dependencies (see `ai/requirements.txt`):
+   ```bash
+   pip install -r ai/requirements.txt
+   pip install "crewai[google-genai]"   # only if using Gemini
+   ```
+4. Try a live end-to-end call from the repo root:
+   ```bash
+   python -c "from ai.services.feedback_analyzer import analyze_feedback; import json; print(json.dumps(analyze_feedback(text='The app keeps crashing whenever I try to upload a document.'), indent=2))"
+   ```
+   Expect `ai_status: "completed"` with real `theme`/`pain_point`
+   values. If you see `ai_status: "not_configured"`, double-check your
+   `.env`. If you see `ai_status: "failed"` with a **404 NOT_FOUND /
+   "model ... is not found"** error, the configured Gemini model
+   version has been retired (Google does this on a rolling basis) —
+   list the models your own key currently supports and update
+   `AI_MODEL` in `.env`:
+   ```bash
+   python -c "from google import genai; import os; from dotenv import load_dotenv; load_dotenv(); client = genai.Client(api_key=os.environ['GEMINI_API_KEY']); [print(m.name) for m in client.models.list() if 'generateContent' in (m.supported_actions or [])]"
+   ```
 
 ## Future AI pipeline
 
@@ -181,15 +250,17 @@ Data Cleaning              ← MILESTONE 1 (done)
     ↓
 Text Preprocessing         ← MILESTONE 1 (done)
     ↓
-Sentiment Analysis         ← Future
+Theme Extraction (CrewAI agent)         ← MILESTONE 2 (done)
     ↓
-Theme Extraction (embeddings + clustering)   ← Future
+Pain Point Identification (CrewAI agent) ← MILESTONE 2 (done)
     ↓
-Pain Point Identification (LLM summarization)  ← Future
+Feature Request Detection (CrewAI agent) ← MILESTONE 2 (done)
     ↓
-Feature Opportunity Detection  ← Future
+Feature Request Clustering (embeddings)  ← MILESTONE 2 (done, batch)
     ↓
-Feature Clustering → Prioritization → PRD/User Stories/Roadmap  ← Future
+Sentiment Analysis         ← Future (different milestone/owner)
+    ↓
+Prioritization → PRD/User Stories/Roadmap  ← Future
 ```
 
 ## Team integration diagram
@@ -239,16 +310,30 @@ checklists — not duplicated here to avoid the two docs drifting apart.
 
 ## Limitations
 
-- No AI model implemented yet — all five `ai_analysis` fields are
-  always `None`. This is by design for Milestone 1, not a bug.
-- Duplicate-description detection is exact-text-match only; won't
-  catch differently-worded duplicates (planned for Milestone 2 via
-  embeddings).
+- Sentiment analysis and generic `category` classification are not
+  part of this Milestone 2 AI scope — both fields stay `None`. This is
+  by design (see the project brief), not a bug.
+- Duplicate-description detection (Milestone 1) is exact-text-match
+  only; won't catch differently-worded duplicate tickets.
 - `MIN_DESCRIPTION_LENGTH` is a simple heuristic, not learned from
   data — reasonable for now, worth revisiting on the real dataset.
-- Environment variables for Milestone 2 (`AI_MODEL`, `OPENAI_API_KEY`,
-  `GEMINI_API_KEY`) are wired into `config.py` but not used by any
-  code yet.
+- Feature request clustering's real-embeddings path was built and unit
+  tested with mocked embedding calls, but **not exercised against a
+  live OpenAI/Gemini embeddings call** in this development environment
+  (no network access to those hosts here) — run the Milestone 2 setup
+  smoke test above with a real key before demoing clustering live.
+  The TF-IDF fallback path (used automatically when no provider is
+  configured) was fully tested for real.
+- Live CrewAI agent calls (theme/pain-point/feature-request extraction)
+  were built against the real installed `crewai` API and are unit
+  tested via dependency-injected fake crews (`ai/tests/test_crew.py`),
+  but likewise not exercised end-to-end against a live API in this
+  environment — see docs/AI_INTEGRATION.md section 10.
+- CrewAI's own dependency footprint is fairly large (it pulls in
+  several sub-dependencies beyond just the LLM SDK). This was accepted
+  as the cost of using the specifically-requested CrewAI framework;
+  `sentence-transformers`/PyTorch was deliberately avoided for
+  clustering to keep the *additional* footprint smaller.
 
 ## Milestone 1 demo sequence
 
@@ -259,37 +344,62 @@ checklists — not duplicated here to avoid the two docs drifting apart.
 4. Run `python -m ai.pipeline.feedback_pipeline --sample` — show the
    before/after quality report and the `INFO` log lines.
 5. Open `ai/data/processed/cleaned_feedback.csv` — show cleaned rows
-   plus the five empty `ai_analysis`-equivalent columns.
+   plus the empty `ai_analysis`-equivalent columns.
 6. Open `data_quality_report.json` — real, measured numbers.
 7. Show the schema (`schemas/feedback.py`) — raw vs. normalized vs.
    AI-generated layers.
-8. Show the AI pipeline diagram above — done vs. future.
-9. Run `pytest ai/tests/ -v` — 20 tests, no MongoDB/FastAPI/React needed.
-10. Show `services/feedback_analyzer.py` and call `analyze_feedback()`
-    live in a Python shell — this is exactly what the backend will do.
-11. Walk through `docs/AI_INTEGRATION.md` — the actual handoff contract.
+
+## Milestone 2 demo sequence
+
+1. Show `ai/agents/crew.py` — the three agents, their roles/goals, and
+   how the crew runs them sequentially.
+2. Run the live smoke test from "Milestone 2 setup" above — show a
+   real `theme`/`pain_point` result coming back for a sample complaint.
+3. Run it again with feedback that contains a feature request (e.g.
+   *"I wish I could save my frequently used reports"*) — show
+   `feature_opportunity` and `feature_category` populated.
+4. Run it a third time with pure positive feedback with no request —
+   show `feature_opportunity: null` and explain the agent is being
+   honest, not failing.
+5. Show `ai/services/feature_clustering.py` grouping the payment
+   example (`Add UPI payments` / `Support Google Pay` / `Give us more
+   payment options`) into one opportunity.
+6. Temporarily unset both API keys and re-run step 2 — show
+   `ai_status: "not_configured"` with a clear message, proving nothing
+   is silently faked when unconfigured.
+7. Run `pytest ai/tests/ -v` — 46 tests, including all original
+   Milestone 1 tests still passing unmodified, no MongoDB/FastAPI/React
+   or live API key needed for the full suite.
+8. Walk through `docs/AI_INTEGRATION.md` sections 4 and 4b — the
+   actual backend handoff contract.
 
 ## Viva explanation (simple language)
 
-"For Milestone 1, I picked a public Kaggle dataset of customer support
-tickets and cleaned it — removed duplicates, handled missing values,
-and standardized the text without deleting real customer words. But
-the bigger change this round was making my code ready for the rest of
-the team: I built one single function, `analyze_feedback()`, that the
-backend teammate can call without knowing anything about pandas or
-file paths — they just send text in and get a structured result back.
-I also defined one shared schema for what a 'feedback record' looks
-like, so the AI module, the backend, and the database all agree on the
-same field names. Nothing about the AI analysis itself is faked — the
-sentiment/theme/pain-point fields exist in the schema but stay empty
-until Milestone 2 actually implements that logic."
+"Milestone 1 was about cleaning the data and designing the schema.
+Milestone 2 is where the actual AI comes in: I built three CrewAI
+agents that each read a piece of customer feedback and pull out one
+specific thing — a Theme Extraction Agent finds the topic, a Pain
+Point Agent states the real problem in plain language, and a Feature
+Request Agent notices when the customer is asking for something new,
+categorizes it, and honestly says 'no request here' when there isn't
+one rather than inventing one. All three run through CrewAI as a
+sequential crew and return structured, validated data instead of
+free-form paragraphs. I also built a separate clustering step that
+groups similar feature requests together — like 'add UPI payments' and
+'support Google Pay' both being about payment options — using semantic
+embeddings from whichever AI provider we've configured. The backend
+still only needs to call one function, `analyze_feedback()`, exactly
+like before; it just gets richer results now. And if no API key is
+configured, or the AI call fails, the system says so honestly instead
+of making something up."
 
 ## Future milestones
 
-- **Milestone 2**: implement sentiment analysis and embedding-based
-  theme clustering; use an LLM to summarize clusters into pain points
-  and feature opportunities; `analyze_feedback()`'s output grows to
-  include these fields (contract already documented).
-- **Milestone 3**: feature clustering and prioritization logic.
+- **Milestone 2 (this milestone)**: three CrewAI agents (Theme, Pain
+  Point, Feature Request) plus feature-request clustering —
+  implemented, see "Milestone 2" section above.
+- **Milestone 3**: sentiment analysis (separate scope/owner per the
+  project brief), feature prioritization logic, business impact
+  analysis.
 - **Milestone 4**: PRD generation, user story generation, roadmap
   generation, and the conversational product-intelligence assistant.

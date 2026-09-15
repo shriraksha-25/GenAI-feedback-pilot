@@ -18,6 +18,12 @@ a plain, JSON-compatible dict, which converts to a Pydantic model (or
 straight to JSON, or straight to a MongoDB document) with zero
 friction on the backend side.
 
+(Milestone 2 note: `ai/agents/schemas.py` — the per-agent structured
+outputs used internally by the CrewAI layer — DOES use Pydantic,
+because that's what `crewai`'s `Task(output_pydantic=...)` requires,
+and crewai already depends on Pydantic transitively. That's a
+different, internal concern from this file, which stays dataclasses.)
+
 THREE DISTINCT LAYERS — DO NOT MIX THEM UP
 ---------------------------------------------
 1. RAW dataset fields  — whatever the Kaggle CSV happens to call them.
@@ -27,7 +33,9 @@ THREE DISTINCT LAYERS — DO NOT MIX THEM UP
    `description`, ...). Everything in this module, `preprocessing/`,
    `pipeline/`, and `services/` uses ONLY these names.
 3. AI-GENERATED fields  — `sentiment`, `category`, `theme`,
-   `pain_point`, `feature_opportunity`. Always `None` in Milestone 1.
+   `pain_point`, `feature_opportunity`, `feature_category`,
+   `feature_opportunity_group`, `confidence`. See AIAnalysis below for
+   which of these Milestone 2 actually populates.
 """
 
 from __future__ import annotations
@@ -74,15 +82,32 @@ class FeedbackRecord:
 
 
 # ---------------------------------------------------------------------
-# LAYER 3: AI-generated fields — the "future" part of the schema
+# LAYER 3: AI-generated fields
 # ---------------------------------------------------------------------
 @dataclass
 class AIAnalysis:
     """
-    All fields here are None until Milestone 2+ actually implements
-    the corresponding analysis. Milestone 1 code must never invent a
-    value for these — see README "Code quality" / "No fabricated
-    results" rule.
+    Milestone 2 status per field (see docs/AI_INTEGRATION.md for the
+    full explanation):
+
+    - theme, pain_point: populated by the Theme Extraction Agent and
+      Customer Pain Point Agent (ai/agents/crew.py).
+    - feature_opportunity, feature_category: populated by the Feature
+      Request Agent. `feature_opportunity` holds the per-record
+      extracted request; it is None when that record contained no
+      feature request at all (never fabricated).
+    - feature_opportunity_group: populated separately, and only in
+      batch, by ai.services.feature_clustering.cluster_feature_requests()
+      after grouping several records' feature_opportunity values
+      together. A single analyze_feedback() call cannot populate this
+      field by itself — clustering needs multiple records to compare.
+    - confidence: per-field model confidence scores (0.0-1.0) for
+      theme/pain_point/feature_opportunity, keyed the same way.
+    - sentiment, category: NOT part of this Milestone 2 AI
+      responsibility (see project brief — sentiment/category were
+      reserved in the Milestone 1 schema for a different milestone /
+      teammate). They remain None here; nothing in this codebase
+      invents a value for them.
     """
 
     sentiment: Optional[str] = None
@@ -90,6 +115,9 @@ class AIAnalysis:
     theme: Optional[str] = None
     pain_point: Optional[str] = None
     feature_opportunity: Optional[str] = None
+    feature_category: Optional[str] = None
+    feature_opportunity_group: Optional[str] = None
+    confidence: Optional[dict] = None  # e.g. {"theme": 0.9, "pain_point": 0.92, "feature_opportunity": 0.88}
 
     def to_dict(self) -> dict:
         return asdict(self)
