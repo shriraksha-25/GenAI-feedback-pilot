@@ -12,6 +12,12 @@ class AIAnalysis(BaseModel):
     pain_point: str | None = None
     feature_opportunity: str | None = None
 
+    # Milestone 2 CrewAI fields
+    feature_category: str | None = None
+    confidence: dict[str, float | None] | None = None
+    ai_status: str | None = None
+    ai_error: str | None = None
+
 
 class FeedbackRecord(BaseModel):
     """Canonical feedback structure shared with the AI module."""

@@ -36,6 +36,10 @@ class AIAnalysisResponse(BaseModel):
     theme: Optional[str] = None
     pain_point: Optional[str] = None
     feature_opportunity: Optional[str] = None
+    feature_category: Optional[str] = None
+    confidence: Optional[dict[str, float | None]] = None
+    ai_status: Optional[str] = None
+    ai_error: Optional[str] = None
 
 
 class FeedbackResponse(BaseModel):
