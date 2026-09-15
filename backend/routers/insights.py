@@ -1,5 +1,8 @@
+import asyncio
+
 from fastapi import APIRouter
 
+from ai.services.feature_clustering import cluster_feature_requests
 from database.connection import get_database
 
 
@@ -220,6 +223,78 @@ async def get_feature_request_insights():
     except RuntimeError:
         return {
             "feature_requests": [],
+            "database_status": "unavailable"
+        }
+
+
+@insights_router.get("/feature-clusters")
+async def get_feature_clusters():
+    try:
+        database = get_database()
+        feedback_collection = database["feedback"]
+
+        cursor = feedback_collection.find(
+            {
+                "ai_analysis.feature_opportunity": {
+                    "$ne": None
+                }
+            },
+            {
+                "feedback_id": 1,
+                "ai_analysis.feature_opportunity": 1
+            }
+        )
+
+        items = []
+
+        async for document in cursor:
+            ai_analysis = document.get("ai_analysis", {})
+            feature_request = ai_analysis.get("feature_opportunity")
+
+            if feature_request:
+                items.append({
+                    "feedback_id": document.get("feedback_id"),
+                    "feature_request": feature_request
+                })
+
+        clustered_items = await asyncio.to_thread(
+            cluster_feature_requests,
+            items
+        )
+
+        clusters = {}
+
+        for item in clustered_items:
+            group = item["feature_opportunity_group"]
+
+            if group not in clusters:
+                clusters[group] = {
+                    "feature_opportunity_group": group,
+                    "count": 0,
+                    "requests": []
+                }
+
+            clusters[group]["count"] += 1
+
+            clusters[group]["requests"].append({
+                "feedback_id": item.get("feedback_id"),
+                "feature_request": item.get("feature_request")
+            })
+
+        feature_clusters = sorted(
+            clusters.values(),
+            key=lambda cluster: cluster["count"],
+            reverse=True
+        )
+
+        return {
+            "feature_clusters": feature_clusters,
+            "database_status": "connected"
+        }
+
+    except RuntimeError:
+        return {
+            "feature_clusters": [],
             "database_status": "unavailable"
         }
 
