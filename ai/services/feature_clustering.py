@@ -31,7 +31,7 @@ project already using CrewAI + a GenAI API), this module reuses
 whichever GenAI provider is ALREADY configured for the three agents
 (ai.agents.llm) and calls its embeddings endpoint directly:
   - OPENAI_API_KEY configured  -> OpenAI `text-embedding-3-small`
-  - GEMINI_API_KEY configured  -> Gemini `text-embedding-004`
+  - GEMINI_API_KEY configured  -> Gemini `gemini-embedding-001`
 No new provider, no new API key, no new heavy dependency.
 
 FALLBACK WHEN NO PROVIDER IS CONFIGURED
@@ -74,7 +74,7 @@ logger = logging.getLogger("ai.services.feature_clustering")
 #     typically land well under this even with zero shared words.
 #   - With the TF-IDF fallback, this is tuned for short phrases so
 #     requests need meaningfully overlapping wording to group.
-DEFAULT_DISTANCE_THRESHOLD = 0.55
+DEFAULT_DISTANCE_THRESHOLD = 0.35
 
 
 class FeatureRequestItem(TypedDict, total=False):
@@ -218,7 +218,7 @@ def _embed_with_gemini(texts: list[str]) -> Optional[np.ndarray]:
         from google import genai
 
         client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.embed_content(model="text-embedding-004", contents=texts)
+        response = client.models.embed_content(model="gemini-embedding-001", contents=texts)
         return np.array([e.values for e in response.embeddings])
     except Exception:  # noqa: BLE001 - embeddings are best-effort; TF-IDF fallback always available
         logger.warning("Gemini embedding call failed; falling back to TF-IDF.", exc_info=True)
