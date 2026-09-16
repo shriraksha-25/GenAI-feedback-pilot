@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "../components/layout/MainLayout";
 import Dashboard from "../pages/Dashboard";
 import CustomerFeedback from "../pages/CustomerFeedback";
-
+import Insights from "../pages/Insights";
 function Placeholder({ title, description }) {
   return (
     <div className="mx-auto max-w-7xl">
@@ -54,10 +54,8 @@ function AppRoutes() {
           <Route
             path="/insights"
             element={
-              <Placeholder
-                title="AI Insights"
-                description="Explore AI-generated product insights."
-              />
+              <Insights />
+              
             }
           />
 

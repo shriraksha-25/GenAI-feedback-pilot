@@ -4,6 +4,10 @@ from fastapi import APIRouter
 
 from ai.services.feature_clustering import cluster_feature_requests
 from database.connection import get_database
+from database.dashboard_queries import (
+    get_dashboard_insights as fetch_dashboard_insights,
+    get_feedback_trends as fetch_feedback_trends,
+)
 
 
 insights_router = APIRouter(
@@ -12,6 +16,38 @@ insights_router = APIRouter(
 )
 
 
+# =========================================================
+# CONSOLIDATED DASHBOARD
+# =========================================================
+
+@insights_router.get("/dashboard")
+async def get_dashboard():
+    try:
+        dashboard = await fetch_dashboard_insights()
+
+        return {
+            "dashboard": dashboard,
+            "database_status": "connected"
+        }
+
+    except RuntimeError:
+        return {
+            "dashboard": {
+                "total_analyzed": 0,
+                "themes": [],
+                "pain_points": [],
+                "feature_categories": [],
+                "feature_requests": [],
+                "sentiments": []
+            },
+            "database_status": "unavailable"
+        }
+
+
+# =========================================================
+# SUMMARY
+# =========================================================
+
 @insights_router.get("/summary")
 async def get_insights_summary():
     try:
@@ -19,6 +55,7 @@ async def get_insights_summary():
         feedback_collection = database["feedback"]
 
         total_feedback = await feedback_collection.count_documents({})
+
         negative_feedback = await feedback_collection.count_documents(
             {"ai_analysis.sentiment": "negative"}
         )
@@ -37,6 +74,10 @@ async def get_insights_summary():
         }
 
 
+# =========================================================
+# SENTIMENTS
+# =========================================================
+
 @insights_router.get("/sentiments")
 async def get_sentiment_insights():
     try:
@@ -44,7 +85,13 @@ async def get_sentiment_insights():
         feedback_collection = database["feedback"]
 
         pipeline = [
-            {"$match": {"ai_analysis.sentiment": {"$ne": None}}},
+            {
+                "$match": {
+                    "ai_analysis.sentiment": {
+                        "$nin": [None, ""]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": "$ai_analysis.sentiment",
@@ -57,6 +104,7 @@ async def get_sentiment_insights():
         cursor = await feedback_collection.aggregate(pipeline)
 
         sentiments = []
+
         async for item in cursor:
             sentiments.append({
                 "sentiment": item["_id"],
@@ -75,6 +123,10 @@ async def get_sentiment_insights():
         }
 
 
+# =========================================================
+# CATEGORIES
+# =========================================================
+
 @insights_router.get("/categories")
 async def get_category_insights():
     try:
@@ -82,7 +134,13 @@ async def get_category_insights():
         feedback_collection = database["feedback"]
 
         pipeline = [
-            {"$match": {"ai_analysis.category": {"$ne": None}}},
+            {
+                "$match": {
+                    "ai_analysis.category": {
+                        "$nin": [None, ""]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": "$ai_analysis.category",
@@ -95,6 +153,7 @@ async def get_category_insights():
         cursor = await feedback_collection.aggregate(pipeline)
 
         categories = []
+
         async for item in cursor:
             categories.append({
                 "category": item["_id"],
@@ -113,6 +172,10 @@ async def get_category_insights():
         }
 
 
+# =========================================================
+# THEMES
+# =========================================================
+
 @insights_router.get("/themes")
 async def get_theme_insights():
     try:
@@ -120,7 +183,13 @@ async def get_theme_insights():
         feedback_collection = database["feedback"]
 
         pipeline = [
-            {"$match": {"ai_analysis.theme": {"$ne": None}}},
+            {
+                "$match": {
+                    "ai_analysis.theme": {
+                        "$nin": [None, ""]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": "$ai_analysis.theme",
@@ -133,6 +202,7 @@ async def get_theme_insights():
         cursor = await feedback_collection.aggregate(pipeline)
 
         themes = []
+
         async for item in cursor:
             themes.append({
                 "theme": item["_id"],
@@ -151,6 +221,10 @@ async def get_theme_insights():
         }
 
 
+# =========================================================
+# PAIN POINTS
+# =========================================================
+
 @insights_router.get("/pain-points")
 async def get_pain_point_insights():
     try:
@@ -158,7 +232,13 @@ async def get_pain_point_insights():
         feedback_collection = database["feedback"]
 
         pipeline = [
-            {"$match": {"ai_analysis.pain_point": {"$ne": None}}},
+            {
+                "$match": {
+                    "ai_analysis.pain_point": {
+                        "$nin": [None, ""]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": "$ai_analysis.pain_point",
@@ -171,6 +251,7 @@ async def get_pain_point_insights():
         cursor = await feedback_collection.aggregate(pipeline)
 
         pain_points = []
+
         async for item in cursor:
             pain_points.append({
                 "pain_point": item["_id"],
@@ -189,6 +270,10 @@ async def get_pain_point_insights():
         }
 
 
+# =========================================================
+# FEATURE REQUESTS
+# =========================================================
+
 @insights_router.get("/feature-requests")
 async def get_feature_request_insights():
     try:
@@ -196,7 +281,13 @@ async def get_feature_request_insights():
         feedback_collection = database["feedback"]
 
         pipeline = [
-            {"$match": {"ai_analysis.feature_opportunity": {"$ne": None}}},
+            {
+                "$match": {
+                    "ai_analysis.feature_opportunity": {
+                        "$nin": [None, ""]
+                    }
+                }
+            },
             {
                 "$group": {
                     "_id": "$ai_analysis.feature_opportunity",
@@ -209,6 +300,7 @@ async def get_feature_request_insights():
         cursor = await feedback_collection.aggregate(pipeline)
 
         feature_requests = []
+
         async for item in cursor:
             feature_requests.append({
                 "feature_request": item["_id"],
@@ -227,6 +319,10 @@ async def get_feature_request_insights():
         }
 
 
+# =========================================================
+# FEATURE CLUSTERS
+# =========================================================
+
 @insights_router.get("/feature-clusters")
 async def get_feature_clusters():
     try:
@@ -236,7 +332,7 @@ async def get_feature_clusters():
         cursor = feedback_collection.find(
             {
                 "ai_analysis.feature_opportunity": {
-                    "$ne": None
+                    "$nin": [None, ""]
                 }
             },
             {
@@ -249,13 +345,22 @@ async def get_feature_clusters():
 
         async for document in cursor:
             ai_analysis = document.get("ai_analysis", {})
-            feature_request = ai_analysis.get("feature_opportunity")
+
+            feature_request = ai_analysis.get(
+                "feature_opportunity"
+            )
 
             if feature_request:
                 items.append({
                     "feedback_id": document.get("feedback_id"),
                     "feature_request": feature_request
                 })
+
+        if not items:
+            return {
+                "feature_clusters": [],
+                "database_status": "connected"
+            }
 
         clustered_items = await asyncio.to_thread(
             cluster_feature_requests,
@@ -299,40 +404,14 @@ async def get_feature_clusters():
         }
 
 
+# =========================================================
+# TRENDS
+# =========================================================
+
 @insights_router.get("/trends")
 async def get_feedback_trends():
     try:
-        database = get_database()
-        feedback_collection = database["feedback"]
-
-        pipeline = [
-            {
-                "$match": {
-                    "created_at": {
-                        "$type": "string",
-                        "$ne": ""
-                    }
-                }
-            },
-            {
-                "$group": {
-                    "_id": {
-                        "$substrBytes": ["$created_at", 0, 10]
-                    },
-                    "feedback_count": {"$sum": 1}
-                }
-            },
-            {"$sort": {"_id": 1}}
-        ]
-
-        cursor = await feedback_collection.aggregate(pipeline)
-
-        trends = []
-        async for item in cursor:
-            trends.append({
-                "date": item["_id"],
-                "feedback_count": item["feedback_count"]
-            })
+        trends = await fetch_feedback_trends()
 
         return {
             "trends": trends,
