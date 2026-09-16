@@ -1,78 +1,60 @@
-# MongoDB Database Module
+# database/
 
-This folder contains the MongoDB configuration, data models, connection
-management, and index initialization for the AI Product Manager Copilot.
+Owned by the database teammate. Not yet populated.
 
-## Database
+See ../docs/AI_INTEGRATION.md section 5 ("AI <-> MongoDB contract")
+for the canonical feedback document shape the AI module expects to
+eventually populate, and section 8 for a database handoff checklist.
 
-- Database name: `product_assistant`
-- Database service: MongoDB Atlas
-- Python driver: PyMongo Async
+## Milestone 2 database support
 
-## Collections
+Milestone 2 extends each feedback document with AI-generated analysis:
 
-### `users`
+- AI processing status
+- Theme and sentiment
+- Customer pain point
+- Feature opportunity and category
+- Feature-opportunity group and cluster ID
+- Confidence scores
+- Analysis timestamps and errors
 
-Stores application users.
+### Save and retrieve analysis
 
-Important fields:
+```python
+from database.feedback_repository import (
+    get_analyzed_feedback,
+    get_feedback_by_id,
+    save_feedback_analysis,
+)
 
-- `name`
-- `email`
-- `role`
-- `is_active`
+await save_feedback_analysis(feedback_id, analysis_result)
+feedback = await get_feedback_by_id(feedback_id)
+records = await get_analyzed_feedback(workspace_id)
+```
 
-### `workspaces`
+The dictionary returned by `ai.services.feedback_analyzer.analyze_feedback()`
+can be passed directly to `save_feedback_analysis()`.
 
-Stores product-management workspaces.
+### Dashboard and trend queries
 
-Important fields:
+```python
+from database.dashboard_queries import (
+    get_dashboard_insights,
+    get_feedback_trends,
+)
 
-- `name`
-- `description`
-- `owner_id`
-- `members`
-- `status`
+insights = await get_dashboard_insights(workspace_id)
+trends = await get_feedback_trends(workspace_id, days=30)
+```
 
-### `feedback`
+### Verification
 
-Stores normalized customer-feedback records.
-
-Required fields:
-
-- `feedback_id`
-- `source`
-- `description`
-
-AI-generated results are stored inside the `ai_analysis` sub-document.
-
-### `data_imports`
-
-Stores information about imported customer-feedback datasets.
-
-Important fields:
-
-- `workspace_id`
-- `file_name`
-- `source`
-- `status`
-- Record counts
-- `uploaded_by`
-- `uploaded_at`
-
-## File structure
-
-- `config.py`: Loads MongoDB environment settings.
-- `connection.py`: Manages the asynchronous MongoDB connection.
-- `models.py`: Defines database data models.
-- `indexes.py`: Creates application indexes.
-- `init_db.py`: Tests the connection and initializes indexes.
-- `requirements.txt`: Contains database dependencies.
-
-## Local setup
-
-Create and activate a virtual environment:
+After configuring the local `.env`, run:
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
+python -m database.init_db
+python -m database.verify_milestone2
+```
+
+The verification script creates a temporary record, tests all Milestone 2
+operations, and removes the temporary record afterward.

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from ai.services.feedback_analyzer import analyze_feedback
 from database.connection import get_database
+from database.feedback_repository import save_feedback_analysis
 from database.models import StoredFeedbackRecord, AIAnalysis
 
 
@@ -40,7 +41,7 @@ async def process_feedback(
         feature_opportunity=result.get("feature_opportunity"),
         feature_category=result.get("feature_category"),
         confidence=result.get("confidence"),
-        ai_status=result.get("ai_status"),
+        ai_status=result.get("ai_status", "pending"),
         ai_error=result.get("ai_error"),
     )
 
@@ -51,14 +52,26 @@ async def process_feedback(
         description=cleaned_text,
         status=status,
         created_at=datetime.now(timezone.utc).isoformat(),
-        ai_analysis=ai_analysis,
+        ai_analysis=AIAnalysis(),
     )
 
     try:
         database = get_database()
+
         await database["feedback"].insert_one(
-            feedback_record.model_dump()
+            feedback_record.model_dump(mode="python")
         )
+
+        updated_record = await save_feedback_analysis(
+            feedback_id,
+            ai_analysis,
+        )
+
+        if updated_record and updated_record.get("ai_analysis"):
+            ai_analysis = AIAnalysis.model_validate(
+                updated_record["ai_analysis"]
+            )
+
     except RuntimeError:
         pass
 
@@ -66,5 +79,5 @@ async def process_feedback(
         "feedback_id": feedback_id,
         "feedback_text": cleaned_text,
         "status": status,
-        "ai_analysis": ai_analysis.model_dump(),
+        "ai_analysis": ai_analysis.model_dump(mode="python"),
     }
