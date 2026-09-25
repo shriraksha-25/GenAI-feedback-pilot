@@ -1,6 +1,6 @@
 from typing import Any
 
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
 
 
 async def create_indexes(database: Any) -> None:
@@ -13,7 +13,7 @@ async def create_indexes(database: Any) -> None:
         name="email_1",
     )
 
-    # Each normalized feedback record must have a unique feedback ID.
+    # Each feedback record must have a unique feedback ID.
     await database.feedback.create_index(
         [("feedback_id", ASCENDING)],
         unique=True,
@@ -36,6 +36,46 @@ async def create_indexes(database: Any) -> None:
     await database.feedback.create_index(
         [("ai_analysis.theme", ASCENDING)],
         name="feedback_theme",
+    )
+
+    # Support retrieving completed analysis by workspace and date.
+    await database.feedback.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("ai_analysis.ai_status", ASCENDING),
+            ("ai_analysis.analyzed_at", DESCENDING),
+        ],
+        name="feedback_analysis_status_date",
+    )
+
+    # Support dashboard grouping by feature category.
+    await database.feedback.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("ai_analysis.feature_category", ASCENDING),
+        ],
+        name="feedback_feature_category",
+    )
+
+    # Support dashboard grouping by sentiment.
+    await database.feedback.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("ai_analysis.sentiment", ASCENDING),
+        ],
+        name="feedback_sentiment",
+    )
+
+    # Support grouped feature-opportunity insights.
+    await database.feedback.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            (
+                "ai_analysis.feature_opportunity_group",
+                ASCENDING,
+            ),
+        ],
+        name="feedback_feature_group",
     )
 
     # Support finding workspaces belonging to a user.

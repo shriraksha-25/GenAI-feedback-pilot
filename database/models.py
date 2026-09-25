@@ -3,14 +3,36 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 
-class AIAnalysis(BaseModel):
-    """AI-generated analysis fields."""
+class AnalysisConfidence(BaseModel):
+    """Confidence scores returned by the AI analysis."""
 
+    theme: float | None = Field(default=None, ge=0.0, le=1.0)
+    pain_point: float | None = Field(default=None, ge=0.0, le=1.0)
+    feature_opportunity: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class AIAnalysis(BaseModel):
+    """Milestone 2 AI-generated analysis stored with feedback."""
+
+    ai_status: str = "pending"
+    theme: str | None = None
     sentiment: str | None = None
     category: str | None = None
-    theme: str | None = None
     pain_point: str | None = None
     feature_opportunity: str | None = None
+    feature_category: str | None = None
+    feature_opportunity_group: str | None = None
+    cluster_id: int | None = None
+    confidence: AnalysisConfidence = Field(
+        default_factory=AnalysisConfidence
+    )
+    ai_error: str | None = None
+    analyzed_at: datetime | None = None
+    analysis_updated_at: datetime | None = None
 
 
 class FeedbackRecord(BaseModel):
