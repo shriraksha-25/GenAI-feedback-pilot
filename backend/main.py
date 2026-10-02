@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers.feedback import feedback_router
 from backend.routers.insights import insights_router
+from backend.routers.requirements import requirements_router
+from backend.routers.priority import priority_router
+from backend.routers.chat import chat_router
 from database.connection import (
     connect_to_mongodb,
     close_mongodb_connection,
@@ -32,7 +35,7 @@ app = FastAPI(
         "Backend service for analysing customer feedback "
         "and supporting product planning."
     ),
-    version="0.2.0",
+    version="0.4.0",
     lifespan=lifespan,
 )
 
@@ -51,6 +54,9 @@ app.add_middleware(
 
 app.include_router(feedback_router)
 app.include_router(insights_router)
+app.include_router(requirements_router)
+app.include_router(priority_router)
+app.include_router(chat_router)
 
 
 @app.get("/")
