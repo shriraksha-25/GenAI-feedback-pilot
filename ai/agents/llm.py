@@ -11,19 +11,28 @@ Milestone 1 left both OPENAI_API_KEY and GEMINI_API_KEY as blank
 placeholders in .env.example with AI_MODEL="not_configured" — no
 provider had actually been chosen or wired up yet. For Milestone 2:
 
-  RECOMMENDATION: Google Gemini (gemini/gemini-2.5-flash), because
+  RECOMMENDATION: Google Gemini (gemini/gemini-3.6-flash), because
   - it has a genuinely free tier suitable for a student project
     (OpenAI's API is pay-as-you-go with no meaningful free quota),
   - CrewAI supports it as a first-class native provider, and
   - it's fast enough for three short structured-extraction calls per
     piece of feedback.
 
-  Google retires older Gemini versions on a rolling basis (1.0, 1.5,
-  and 2.0 Flash have all been shut down as of this writing) — if the
-  configured model starts returning 404 NOT_FOUND, list the models
-  your own key currently supports and update AI_MODEL in .env:
+  Google retires specific Gemini model versions VERY frequently (1.0,
+  1.5, 2.0 Flash, and 2.5 Flash have all been retired for new users as
+  of this writing, sometimes weeks apart) — if the configured model
+  starts returning 404 NOT_FOUND, the error message usually names the
+  exact replacement model to use (Google includes it directly in the
+  error). If not, list the models your own key currently supports and
+  update AI_MODEL in .env:
 
     python -c "from google import genai; import os; from dotenv import load_dotenv; load_dotenv(); client = genai.Client(api_key=os.environ['GEMINI_API_KEY']); [print(m.name) for m in client.models.list() if 'generateContent' in (m.supported_actions or [])]"
+
+  Alternative: Google also publishes an auto-updated alias,
+  gemini/gemini-flash-latest, that's meant to always point at
+  whichever Flash version is currently stable (hot-swapped by Google
+  with ~2 weeks notice) — worth trying if the pinned version above
+  gets retired again before you next update this file.
 
 That said, this module does NOT hardcode that choice — it picks
 whichever provider is actually configured, preferring OpenAI if both
@@ -57,7 +66,7 @@ from ai.config.config import AI_MODEL, OPENAI_API_KEY, GEMINI_API_KEY
 #   python -c "from google import genai; import os; from dotenv import load_dotenv; load_dotenv(); client = genai.Client(api_key=os.environ['GEMINI_API_KEY']); [print(m.name) for m in client.models.list() if 'generateContent' in (m.supported_actions or [])]"
 #
 _DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-_DEFAULT_GEMINI_MODEL = "gemini/gemini-2.5-flash"
+_DEFAULT_GEMINI_MODEL = "gemini/gemini-3.6-flash"
 
 
 class LLMNotConfiguredError(RuntimeError):
@@ -77,7 +86,7 @@ def get_llm():
     - OPENAI_API_KEY set  -> OpenAI (model = AI_MODEL if it looks like
       an OpenAI model name, else the default gpt-4o-mini).
     - else GEMINI_API_KEY set -> Gemini (model = AI_MODEL if it starts
-      with "gemini/", else the default gemini/gemini-2.5-flash).
+      with "gemini/", else the default gemini/gemini-3.6-flash).
       Requires the optional `google-genai` extra — see ai/requirements.txt.
     - neither set -> LLMNotConfiguredError with setup instructions.
     """
@@ -94,7 +103,7 @@ def get_llm():
     raise LLMNotConfiguredError(
         "No GenAI provider is configured. Set OPENAI_API_KEY or GEMINI_API_KEY "
         "in your .env (copy .env.example -> .env first). "
-        "Recommended for this project: GEMINI_API_KEY with AI_MODEL=gemini/gemini-2.5-flash "
+        "Recommended for this project: GEMINI_API_KEY with AI_MODEL=gemini/gemini-3.6-flash "
         "(get a free key at https://aistudio.google.com/apikey). "
         "See ai/README.md 'Milestone 2 setup' for exact steps."
     )

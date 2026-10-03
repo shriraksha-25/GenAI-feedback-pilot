@@ -307,3 +307,268 @@ clustering step in section 4b has run)
   (`ai/README.md` "Milestone 2 setup" has the exact command) before
   considering this done. Please run that smoke test and let the team
   know the result.
+
+---
+
+# MILESTONE 3 — PRD / User Stories / Acceptance Criteria / Prioritization / Product Intelligence Assistant
+
+Everything below is **new in Milestone 3**, built on top of the
+Milestone 2 contract above without changing it — `analyze_feedback()`'s
+behavior and output shape are exactly as documented in sections 1-4b.
+
+## 11. The shared input: "feature context"
+
+Every Milestone 3 function below takes a **context dict** describing
+one feature, built from Milestone 2 output. See
+`ai/agents/context.py` (`FeatureContext`) for the full type:
+
+```python
+context = {
+    "feature_id": "feat-001",                      # optional, your own ID, echoed back where applicable
+    "feature_name": "Save frequently used reports", # strongly recommended
+    "themes": ["Reporting"],                         # from analyze_feedback()'s "theme" across related records
+    "pain_points": ["Regenerating the same report every time is tedious."],
+    "feature_requests": ["Save frequently used reports"],
+    "feature_opportunity_group": "Reporting Improvements",  # optional, from cluster_feature_requests()
+    "supporting_evidence": [
+        {"feedback_id": "42", "text": "I wish I could save my frequently used reports..."}
+    ],
+    "priority": {"score": 8.4, "reach": 1000, "impact": 2, "confidence": 0.8, "effort": 3, "reasoning": "..."},  # optional, from explain_priority()
+    "prd": {...},            # optional, a previously-generated PRD dict, if asking the assistant about it
+    "user_stories": [...],   # optional, previously-generated user stories
+}
+```
+
+**Every key is optional.** The AI module does not query MongoDB itself
+(see section 10's existing "database separation" reasoning, which
+still holds for M3) — **you (backend) are responsible for**:
+1. Querying feedback records whose `feature_opportunity` or
+   `feature_opportunity_group` matches the feature being worked on.
+2. Collecting their `theme` / `pain_point` / `feature_opportunity`
+   values and original feedback text + `feedback_id` into the shape
+   above.
+3. Passing that dict into whichever function below you're calling.
+
+This is what preserves traceability: `supporting_evidence[i].feedback_id`
+is a real Milestone 2 `feedback_id`, so a generated PRD's
+`supporting_evidence` field (a list of those same feedback_ids) can
+always be traced back to real customer feedback, through themes and
+pain points, without the AI module inventing any IDs along the way.
+
+## 12. PRD generation
+
+```python
+from ai.services.prd_generator import generate_prd
+
+result = generate_prd(context, feature_id="feat-001")
+```
+
+**Output:**
+```json
+{
+  "feature_id": "feat-001",
+  "status": "ai_draft",
+  "prd": {
+    "title": "Save Frequently Used Reports",
+    "problem_statement": "Regenerating the same report every time is tedious.",
+    "feature_summary": "...",
+    "objective": "...",
+    "target_users": ["..."],
+    "customer_pain_points": ["Regenerating the same report every time is tedious."],
+    "feature_requirements": ["..."],
+    "user_value": "...",
+    "business_value": "...",
+    "scope": ["..."],
+    "out_of_scope": ["..."],
+    "assumptions": ["..."],
+    "dependencies": ["..."],
+    "risks": ["..."],
+    "success_metrics": ["..."],
+    "supporting_evidence": ["42"]
+  }
+}
+```
+
+- `status` is `"ai_draft"` on success (never `"approved"` or anything
+  else — **this module never changes status after generation**; status
+  transitions to "Under Review"/"Approved" and version history are
+  entirely the backend/database's responsibility. See section 15.
+- On failure: `status` is `"not_configured"` or `"failed"`, `prd` is
+  `null`, and `error` has a message. **`generate_prd()` never raises.**
+- Any PRD section can be an empty list/string if the supplied context
+  didn't have enough evidence — **this is a valid, expected result**,
+  not an error. Don't treat an empty `risks` list as a bug.
+
+## 13. User story & acceptance criteria generation
+
+```python
+from ai.services.user_story_generator import generate_user_stories, generate_acceptance_criteria
+
+stories = generate_user_stories(context, feature_id="feat-001")
+# stories["user_stories"] -> list of {user_story, user_type, goal, benefit}
+
+ac = generate_acceptance_criteria(
+    user_story_text=stories["user_stories"][0]["user_story"],
+    context=context,   # optional
+)
+# ac["acceptance_criteria"] -> list of {id, criterion, priority}
+```
+
+**`generate_user_stories()` output:**
+```json
+{
+  "feature_id": "feat-001",
+  "status": "ai_draft",
+  "user_stories": [
+    {
+      "user_story": "As a user, I want to save frequently used reports, so that I don't have to regenerate them every time.",
+      "user_type": "user",
+      "goal": "save frequently used reports",
+      "benefit": "don't have to regenerate them every time"
+    }
+  ]
+}
+```
+
+**`generate_acceptance_criteria()` output:**
+```json
+{
+  "feature_id": null,
+  "status": "ai_draft",
+  "acceptance_criteria": [
+    {"id": "AC-1", "criterion": "Clicking Save stores the current report configuration under a user-chosen name.", "priority": "Must"},
+    {"id": "AC-2", "criterion": "Saved reports appear in a 'My Reports' list accessible from the dashboard.", "priority": "Should"}
+  ]
+}
+```
+
+- `id` values (`"AC-1"`, `"AC-2"`, ...) are **local labels for this one
+  generation call only — not database IDs.** If you persist these,
+  assign your own real ID; keep this label as a display string if useful.
+- `generate_acceptance_criteria()` is called **once per user story**
+  (you pass one `user_story_text`), not once for a whole feature — call
+  it separately for each story you want criteria for.
+- 0-5 user stories may be returned (never padded to hit a target count
+  if the evidence doesn't support more).
+
+## 14. Prioritization (deterministic score + AI explanation)
+
+**Important: the numeric score is NEVER computed by the LLM.** You
+(backend/PM, via the frontend) supply Reach/Impact/Confidence/Effort —
+typically from a PM's estimate in a form — and this function computes
+the RICE score with plain arithmetic, then optionally asks the LLM to
+explain it.
+
+```python
+from ai.services.prioritization import calculate_rice_score, explain_priority
+
+# Pure arithmetic, no AI, no API key needed, always available:
+score = calculate_rice_score(reach=1000, impact=2, confidence=0.8, effort=3)  # -> 533.33
+
+# Score + grounded LLM explanation:
+result = explain_priority(context, reach=1000, impact=2, confidence=0.8, effort=3, feature_id="feat-001")
+```
+
+**`explain_priority()` output:**
+```json
+{
+  "feature_id": "feat-001",
+  "priority_score": 533.33,
+  "reach": 1000, "impact": 2, "confidence": 0.8, "effort": 3,
+  "ai_status": "completed",
+  "impact_reasoning": "High impact because multiple customers independently requested this capability...",
+  "supporting_pain_points": ["Regenerating the same report every time is tedious."],
+  "assumptions": [],
+  "evidence_summary": "Two feedback records cite the same friction."
+}
+```
+
+- **`priority_score` is ALWAYS present**, even if `ai_status` is
+  `"failed"` or `"not_configured"` — prioritization numbers are never
+  blocked on GenAI availability. Only `impact_reasoning` /
+  `supporting_pain_points` / `assumptions` / `evidence_summary` go
+  `null`/`[]` on AI failure.
+- If your team already has (or builds) prioritization logic in the
+  backend, `calculate_rice_score()` is pure Python with zero
+  dependencies on the rest of this module — trivial to move/duplicate
+  there instead of calling into the AI module just for arithmetic.
+  `explain_priority()` would still be useful to call separately for
+  just the explanation half, if so.
+
+## 15. Product Intelligence Assistant
+
+```python
+from ai.services.product_assistant import ask_assistant
+
+result = ask_assistant("What customer feedback supports this feature?", context)
+```
+
+**Output:**
+```json
+{
+  "status": "completed",
+  "answer": "Two customers reported the same issue: they have to regenerate the same report repeatedly because there's no way to save a report configuration for reuse.",
+  "grounded": true,
+  "referenced_feedback_ids": ["42"],
+  "confidence": 0.9
+}
+```
+
+- `grounded: false` means the supplied `context` didn't contain enough
+  information to answer — `answer` will say so plainly (e.g. "This
+  information is not available in the provided project context.")
+  rather than guessing. **This is a valid, expected result** — check
+  `grounded` before treating `answer` as a confident fact.
+- **The assistant does NOT generate PRDs/user stories from a chat
+  message.** For "generate a PRD for this feature" /
+  "generate user stories" style requests, call `generate_prd()` /
+  `generate_user_stories()` directly (e.g. from a dedicated button in
+  the UI) — don't route those through `ask_assistant()`. See
+  `ai/agents/assistant_crew.py`'s docstring for the full reasoning.
+- **No RAG / vector database is used or needed.** You decide what
+  context is relevant to a question (e.g. "whichever feature the PM is
+  currently viewing") and pass it in directly — the same pattern as
+  every other M3 function. Your existing MongoDB querying is
+  sufficient "retrieval" at this project's scale; a vector database
+  would be meaningfully more infrastructure for no clear benefit yet.
+
+## 16. Versioning / approval status
+
+Every M3 generation function (`generate_prd`, `generate_user_stories`,
+`generate_acceptance_criteria`) returns `status: "ai_draft"` on
+success — this is the **only** status value the AI module ever
+produces. The team's full status vocabulary (`AI Draft` → `Under
+Review` → `Approved`) and version history are **entirely
+backend/database responsibilities**:
+- This module does not persist anything (no MongoDB writes).
+- This module does not track or transition status after generation.
+- This module does not assign a `prd_id` / `user_story_id` — if you
+  persist generated content, assign your own ID; `feature_id` (which
+  you supplied) is the only ID this module echoes back.
+- Regenerating a PRD/story set is just calling the function again — if
+  you want version history, that's a backend/database concern (e.g.
+  storing each generation as a new version row), not something this
+  module tracks internally.
+
+## 17. What I (AI teammate) additionally need from the Backend teammate for M3
+
+- [ ] Confirm how you'll aggregate Milestone 2 feedback records into
+      the `context` dict shape in section 11 — specifically, how
+      you'll group records by feature (via `feature_opportunity`
+      string match, or the clustered `feature_opportunity_group`
+      after running `cluster_feature_requests()`).
+- [ ] Confirm where Reach/Impact/Confidence/Effort inputs for
+      `explain_priority()` will come from (a PM form in the frontend?
+      a fixed default? per-feature stored values?).
+- [ ] Confirm whether `calculate_rice_score()` should stay in the AI
+      module or move to the backend (it's pure Python — either is fine
+      from my side, your call).
+- [ ] Confirm what "workspace context" the frontend will send for
+      `ask_assistant()` calls — e.g. does it send the currently-viewed
+      feature's full context automatically, or does the PM need to
+      select what to include?
+- [ ] Confirm your plan for the `"ai_draft"` → `"Under Review"` →
+      `"Approved"` status transitions and PRD/story versioning
+      (section 16) — this module doesn't participate in it but the
+      shape of what you persist should probably mirror the `prd`/
+      `user_stories`/`acceptance_criteria` dicts this module returns.
