@@ -1,87 +1,79 @@
-import { Bell, Search } from "lucide-react";
+import React from 'react';
+import { Menu, Bell, Search } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-function Header() {
+export default function Header({ title, description, onMenuClick, searchPlaceholder, onSearch, searchValue }) {
+  const { user } = useAuth();
+
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'PM';
+
   return (
-    <header className="sticky top-0 z-30 h-20 border-b border-slate-200 bg-white">
+    <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 sticky top-0 z-30">
+      {/* Left side: Mobile menu toggle + Page title */}
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="lg:hidden p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md focus:outline-none"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
 
-      <div className="flex h-full items-center justify-between px-6 sm:px-8">
-
-        {/* =========================================
-            SEARCH
-        ========================================== */}
-
-        <div className="relative w-full max-w-md">
-
-          <Search
-            size={16}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-
-          <input
-            type="text"
-            placeholder="Search..."
-            className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-50"
-          />
-
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-base sm:text-lg font-semibold text-slate-900 leading-tight truncate">
+            {title}
+          </h1>
+          {description && (
+            <p className="text-xs text-slate-500 leading-tight truncate hidden sm:block">
+              {description}
+            </p>
+          )}
         </div>
-
-
-        {/* =========================================
-            RIGHT SIDE
-        ========================================== */}
-
-        <div className="ml-6 flex items-center gap-3">
-
-          {/* Notification */}
-
-          <button
-            type="button"
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-            aria-label="Notifications"
-          >
-
-            <Bell size={17} />
-
-            {/* Notification indicator */}
-
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-blue-600 ring-2 ring-white" />
-
-          </button>
-
-
-          {/* Divider */}
-
-          <div className="h-7 w-px bg-slate-200" />
-
-
-          {/* User */}
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-              U
-            </div>
-
-            <div className="hidden sm:block">
-
-              <p className="text-xs font-semibold text-slate-800">
-                User
-              </p>
-
-              <p className="text-[10px] text-slate-400">
-                Product Workspace
-              </p>
-
-            </div>
-
-          </div>
-
-        </div>
-
       </div>
 
+      {/* Right side: Optional search + Notifications + User avatar */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {searchPlaceholder && (
+          <div className="relative hidden md:block w-48 lg:w-64">
+            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={searchValue || ''}
+              onChange={(e) => onSearch && onSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+            />
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="relative p-2 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors focus:outline-none"
+          aria-label="Notifications"
+        >
+          <Bell className="w-4 h-4" />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-emerald-600 rounded-full"></span>
+        </button>
+
+        <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center flex-shrink-0">
+            {userInitials}
+          </div>
+          <span className="text-xs font-medium text-slate-700 hidden sm:inline truncate max-w-[120px]">
+            {user?.name || 'Product Lead'}
+          </span>
+        </div>
+      </div>
     </header>
   );
 }
-
-export default Header;
