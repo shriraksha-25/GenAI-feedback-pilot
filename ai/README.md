@@ -241,6 +241,77 @@ brief — only the three agents above). Both schema fields remain
    python -c "from google import genai; import os; from dotenv import load_dotenv; load_dotenv(); client = genai.Client(api_key=os.environ['GEMINI_API_KEY']); [print(m.name) for m in client.models.list() if 'generateContent' in (m.supported_actions or [])]"
    ```
 
+## Milestone 3 — PRD / User Stories / Acceptance Criteria / Prioritization / Product Intelligence Assistant (implemented)
+
+Built on top of Milestone 2's output, not from scratch — every M3
+function takes a **feature context dict** assembled from M2's
+`theme`/`pain_point`/`feature_opportunity` values plus the original
+feedback text/`feedback_id`, and generates structured content grounded
+in that evidence. See `ai/agents/context.py` for the exact shape and
+`../docs/AI_INTEGRATION.md` sections 11-17 for the full backend contract.
+
+| Capability | File | Function |
+|---|---|---|
+| PRD generation | `ai/services/prd_generator.py` | `generate_prd(context, feature_id)` |
+| User stories | `ai/services/user_story_generator.py` | `generate_user_stories(context, feature_id)` |
+| Acceptance criteria | `ai/services/user_story_generator.py` | `generate_acceptance_criteria(user_story_text, context)` |
+| Prioritization (score) | `ai/services/prioritization.py` | `calculate_rice_score(reach, impact, confidence, effort)` — pure arithmetic, no AI |
+| Prioritization (explanation) | `ai/services/prioritization.py` | `explain_priority(context, reach, impact, confidence, effort)` |
+| Product Intelligence Assistant | `ai/services/product_assistant.py` | `ask_assistant(question, context)` |
+
+Internally, each of these is one single-agent CrewAI "crew" (agent +
+task + `output_pydantic`), defined in `ai/agents/product_crew.py`
+(PRD/stories/AC/priority-explanation) and
+`ai/agents/assistant_crew.py` (the assistant) — **not** a multi-agent
+collaboration like Milestone 2's three-agents-in-one-crew, because
+each of these is a standalone generation task a PM triggers
+separately, not a pipeline that needs agents to hand off to each other.
+
+**Key design decisions** (see each file's docstring for the full reasoning):
+- **The RICE score is never computed by the LLM.** `calculate_rice_score()`
+  is deterministic arithmetic given Reach/Impact/Confidence/Effort
+  (which a PM supplies) — the LLM only explains an already-computed
+  score, never invents or adjusts it.
+- **The assistant doesn't generate PRDs/stories from chat text.**
+  "Generate a PRD for this feature" typed into the assistant is NOT
+  parsed as an action — the frontend should call `generate_prd()`
+  directly (e.g. a button), keeping structured generation and grounded
+  Q&A as separate, independently-reliable capabilities.
+- **No RAG / vector database.** The backend decides what context is
+  relevant to a question and passes it in directly — sufficient at
+  this project's scale, avoids unnecessary infrastructure.
+- **No new IDs invented.** `feature_id` is echoed back if supplied;
+  acceptance criteria get local labels (`AC-1`, `AC-2`, ...) scoped to
+  one call, not database IDs. Persistence, real IDs, and status
+  transitions (`ai_draft` → `Under Review` → `Approved`) are entirely
+  backend/database responsibilities.
+
+### Milestone 3 setup
+
+No new environment variables and no new dependencies — M3 reuses the
+exact same `OPENAI_API_KEY`/`GEMINI_API_KEY`/`AI_MODEL` configuration
+and the same installed `crewai`/`pydantic` as Milestone 2. If
+Milestone 2's live smoke test already works, Milestone 3 will too.
+
+Live smoke test for M3 (from the repo root, same `.env` as Milestone 2):
+```bash
+python -c "
+from ai.services.prd_generator import generate_prd
+context = {
+    'feature_name': 'Save frequently used reports',
+    'themes': ['Reporting'],
+    'pain_points': ['Regenerating the same report every time is tedious.'],
+    'feature_requests': ['Save frequently used reports'],
+    'supporting_evidence': [{'feedback_id': '42', 'text': 'I wish I could save my frequently used reports so I do not have to generate them every time.'}],
+}
+import json
+print(json.dumps(generate_prd(context, feature_id='feat-1'), indent=2))
+"
+```
+Expect `status: "ai_draft"` with a real, evidence-grounded PRD. See
+`ai/tests/test_live_m3_smoke.py` for live tests covering all five M3
+capabilities (opt-in, skipped by default — see that file's docstring).
+
 ## Future AI pipeline
 
 ```
@@ -258,9 +329,17 @@ Feature Request Detection (CrewAI agent) ← MILESTONE 2 (done)
     ↓
 Feature Request Clustering (embeddings)  ← MILESTONE 2 (done, batch)
     ↓
+Prioritization: RICE score (deterministic) + AI explanation  ← MILESTONE 3 (done)
+    ↓
+PRD Generation (CrewAI agent)            ← MILESTONE 3 (done)
+    ↓
+User Story + Acceptance Criteria Generation (CrewAI agents) ← MILESTONE 3 (done)
+    ↓
+Product Intelligence Assistant (grounded Q&A)  ← MILESTONE 3 (done)
+    ↓
 Sentiment Analysis         ← Future (different milestone/owner)
     ↓
-Prioritization → PRD/User Stories/Roadmap  ← Future
+Roadmap Generation / Executive Summaries  ← Future
 ```
 
 ## Team integration diagram
@@ -318,22 +397,37 @@ checklists — not duplicated here to avoid the two docs drifting apart.
 - `MIN_DESCRIPTION_LENGTH` is a simple heuristic, not learned from
   data — reasonable for now, worth revisiting on the real dataset.
 - Feature request clustering's real-embeddings path was built and unit
-  tested with mocked embedding calls, but **not exercised against a
-  live OpenAI/Gemini embeddings call** in this development environment
-  (no network access to those hosts here) — run the Milestone 2 setup
-  smoke test above with a real key before demoing clustering live.
-  The TF-IDF fallback path (used automatically when no provider is
-  configured) was fully tested for real.
-- Live CrewAI agent calls (theme/pain-point/feature-request extraction)
-  were built against the real installed `crewai` API and are unit
-  tested via dependency-injected fake crews (`ai/tests/test_crew.py`),
-  but likewise not exercised end-to-end against a live API in this
-  environment — see docs/AI_INTEGRATION.md section 10.
+  tested with mocked embedding calls; the TF-IDF fallback path (used
+  automatically when no provider is configured) was fully tested for
+  real. Run it with a real key configured to confirm the embeddings
+  path groups cross-vocabulary requests (e.g. "UPI payments" /
+  "Google Pay") as designed.
 - CrewAI's own dependency footprint is fairly large (it pulls in
   several sub-dependencies beyond just the LLM SDK). This was accepted
   as the cost of using the specifically-requested CrewAI framework;
   `sentence-transformers`/PyTorch was deliberately avoided for
   clustering to keep the *additional* footprint smaller.
+- **Milestone 2's three feedback-analysis agents have been verified
+  live** (real Gemini call, `ai_status: "completed"` with a correct
+  theme/pain-point/no-fabricated-feature-request result).
+  **Milestone 3's five capabilities (PRD, user stories, acceptance
+  criteria, priority explanation, assistant) are built against the
+  same verified CrewAI/LLM wiring and are fully unit tested with fake
+  crews (97 tests total), but have not yet been run live** in this
+  development session — run `ai/tests/test_live_m3_smoke.py` (see that
+  file's docstring for the opt-in command) or the smoke test above with
+  a real key, and update this note once confirmed.
+- The Product Intelligence Assistant does not parse "generate a PRD"
+  style requests into an action — this is a deliberate scope boundary,
+  not an oversight (see `ai/agents/assistant_crew.py`). The frontend
+  should call `generate_prd()`/`generate_user_stories()` directly for
+  those, alongside a separate chat interface for grounded Q&A.
+- `calculate_rice_score()`'s formula is the standard RICE formula
+  exactly, with no configurable weighting beyond the four inputs
+  themselves — "configurable scoring" here means the PM controls the
+  four numbers, not that the formula itself has tunable weights. A
+  weighted-formula variant would be a small, isolated change to that
+  one function if the team wants it later.
 
 ## Milestone 1 demo sequence
 
@@ -373,6 +467,34 @@ checklists — not duplicated here to avoid the two docs drifting apart.
 8. Walk through `docs/AI_INTEGRATION.md` sections 4 and 4b — the
    actual backend handoff contract.
 
+## Milestone 3 demo sequence
+
+1. Show `ai/agents/context.py` — explain the feature context dict and
+   how it's built FROM Milestone 2 output (themes/pain points/feature
+   requests/feedback_ids), not from a bare feature name.
+2. Run the PRD live smoke test from "Milestone 3 setup" above — show a
+   real, evidence-grounded PRD with `supporting_evidence` pointing back
+   to the real `feedback_id`.
+3. Call `generate_user_stories()` on the same context, then
+   `generate_acceptance_criteria()` on the first story — show the
+   traceable chain: feedback → theme/pain point → PRD → user story → criteria.
+4. Call `calculate_rice_score(reach=1000, impact=2, confidence=0.8, effort=3)`
+   directly — show it's deterministic (run it twice, same result) and
+   has nothing to do with the LLM.
+5. Call `explain_priority()` with the same inputs — show the score
+   matches step 4 exactly, and the explanation references the actual
+   pain points from the context.
+6. Call `ask_assistant()` with a grounded question (e.g. "what feedback
+   supports this feature?") — show `grounded: true` and real
+   `referenced_feedback_ids`.
+7. Call `ask_assistant()` with an out-of-context question (e.g. "what's
+   our total revenue?") — show `grounded: false` and an honest
+   "not available" answer, proving it doesn't hallucinate.
+8. Run `pytest ai/tests/ -v` — 97 tests passing, no API key or network
+   needed for any of them (the 5 live tests are skipped by default).
+9. Walk through `docs/AI_INTEGRATION.md` sections 11-17 — the full M3
+   backend handoff contract.
+
 ## Viva explanation (simple language)
 
 "Milestone 1 was about cleaning the data and designing the schema.
@@ -391,15 +513,38 @@ embeddings from whichever AI provider we've configured. The backend
 still only needs to call one function, `analyze_feedback()`, exactly
 like before; it just gets richer results now. And if no API key is
 configured, or the AI call fails, the system says so honestly instead
-of making something up."
+of making something up.
+
+For Milestone 3, I extended that same foundation to generate actual
+product artifacts. Given a feature's evidence — its theme, pain
+points, and feature requests from Milestone 2 — I built a PRD
+generator that produces a structured document instead of one long
+paragraph, with separate fields for things like scope, risks,
+assumptions, and supporting evidence, so a PM can actually use it. I
+did the same for user stories and acceptance criteria, in the standard
+formats teams expect. For prioritization, I was careful that the
+actual RICE score is calculated with plain arithmetic, not the AI — I
+only use the AI to explain why a score makes sense, grounded in real
+pain points, never to invent the number itself. And I built a Product
+Intelligence Assistant that answers questions using only the project's
+own data — if it doesn't have enough context to answer something, it
+says so honestly instead of guessing, which I can actually demonstrate
+live. Everything stays structured — every function returns the same
+kind of predictable JSON shape Milestone 2 established, so the backend
+team doesn't need to parse free text anywhere."
 
 ## Future milestones
 
-- **Milestone 2 (this milestone)**: three CrewAI agents (Theme, Pain
-  Point, Feature Request) plus feature-request clustering —
-  implemented, see "Milestone 2" section above.
-- **Milestone 3**: sentiment analysis (separate scope/owner per the
-  project brief), feature prioritization logic, business impact
-  analysis.
-- **Milestone 4**: PRD generation, user story generation, roadmap
-  generation, and the conversational product-intelligence assistant.
+- **Milestone 2**: three CrewAI agents (Theme, Pain Point, Feature
+  Request) plus feature-request clustering — implemented, see
+  "Milestone 2" section above.
+- **Milestone 3 (this milestone)**: PRD generation, user story and
+  acceptance criteria generation, deterministic RICE prioritization
+  with AI-generated explanations, and a grounded Product Intelligence
+  Assistant — implemented, see "Milestone 3" section above.
+- **Milestone 4**: sentiment analysis (still not part of this
+  codebase's scope — separate owner per the original project brief),
+  roadmap generation, executive summaries, and intent-routing for the
+  assistant (e.g. letting "generate a PRD for this" typed in chat
+  trigger `generate_prd()` automatically, rather than requiring a
+  dedicated UI action as it does now).

@@ -14,6 +14,13 @@ scikit-learn>=1.3.0     # TF-IDF + agglomerative clustering for feature-request 
 #   GEMINI_API_KEY set  -> pip install "crewai[google-genai]"   (adds Gemini's native provider support)
 # See ai/README.md "Milestone 2 setup" and ai/agents/llm.py for exact provider selection logic.
 
-# ---- Anticipated Milestone 3+ dependencies (NOT installed/used yet) ----
+# ---- Milestone 3 (PRD / User Stories / Acceptance Criteria / Prioritization / Assistant) ----
+# NO NEW DEPENDENCIES REQUIRED. Milestone 3 reuses crewai, pydantic, and
+# the same GenAI provider SDK already installed for Milestone 2 above -
+# every M3 capability is just another CrewAI Agent+Task against the same
+# configured LLM. Feature prioritization's scoring is pure Python
+# arithmetic (ai/services/prioritization.py) - no dependency at all.
+
+# ---- Anticipated Milestone 4+ dependencies (NOT installed/used yet) ----
 # Uncomment when a later milestone actually implements these.
 # sentence-transformers   # optional upgrade path for feature_clustering.py if TF-IDF grouping proves too coarse
