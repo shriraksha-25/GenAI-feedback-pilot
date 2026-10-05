@@ -8,6 +8,8 @@ from backend.routers.insights import insights_router
 from backend.routers.requirements import requirements_router
 from backend.routers.priority import priority_router
 from backend.routers.chat import chat_router
+from backend.routers.auth import auth_router
+from backend.routers.features import router as features_router
 from database.connection import (
     connect_to_mongodb,
     close_mongodb_connection,
@@ -57,6 +59,8 @@ app.include_router(insights_router)
 app.include_router(requirements_router)
 app.include_router(priority_router)
 app.include_router(chat_router)
+app.include_router(auth_router)
+app.include_router(features_router)
 
 
 @app.get("/")

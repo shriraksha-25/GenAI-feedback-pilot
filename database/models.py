@@ -63,6 +63,7 @@ class UserRecord(BaseModel):
 
     name: str = Field(min_length=1)
     email: str = Field(min_length=3)
+    password_hash: str
     role: str = "product_manager"
     is_active: bool = True
 

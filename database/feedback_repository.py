@@ -13,7 +13,7 @@ async def save_feedback_analysis(
     feedback_id: str,
     analysis: AIAnalysis | dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Save Milestone 2 analysis results in an existing feedback record."""
+    """Save AI analysis results in an existing feedback record."""
 
     database = get_database()
     now = datetime.now(timezone.utc)
@@ -64,6 +64,7 @@ async def get_analyzed_feedback(
 
     database = get_database()
 
+    # Only return successfully analyzed feedback.
     query: dict[str, Any] = {
         "ai_analysis.ai_status": "completed"
     }
