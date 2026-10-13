@@ -222,3 +222,49 @@ The verification script tests:
 - Workspace-level data isolation
 
 All temporary verification records are removed after the test.
+
+## Tamper-Evident Decision Audit Trail
+
+Approved roadmap and executive-summary versions can be protected using a
+cryptographic decision audit trail.
+
+### How it works
+
+1. The system converts the approved document into deterministic JSON.
+2. It generates a SHA-256 content hash.
+3. Each audit record stores the previous version's chain hash.
+4. Approval metadata is included in the chain fingerprint.
+5. Any later modification causes integrity verification to fail.
+
+### Collection
+
+- `decision_audits`: Stores cryptographic fingerprints for approved roadmap and executive-summary versions.
+
+### Protected audit information
+
+- Workspace and entity identifiers
+- Document version
+- SHA-256 content hash
+- Previous-version hash
+- Cryptographic chain hash
+- Approver identity
+- Approval timestamp
+- Audit creation timestamp
+
+### Security benefits
+
+- Detects unauthorized changes to approved decisions.
+- Preserves traceability between approved versions.
+- Prevents duplicate audit records for the same entity version.
+- Supports workspace-level data isolation.
+- Provides verifiable evidence for governance and compliance.
+
+### Verification
+
+```powershell
+python -m database.verify_decision_audit
+```
+
+The verification tests approved-content hashing, duplicate prevention,
+version-chain linkage, tampering detection, content restoration and workspace
+isolation. All temporary verification records are automatically removed.
