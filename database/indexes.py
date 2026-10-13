@@ -470,3 +470,43 @@ async def create_indexes(database: Any) -> None:
         ],
         name="quality_workspace_entity_version",
     )
+
+    # Ensure that an approved entity version receives only
+    # one tamper-evident decision audit record.
+    await database.decision_audits.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("entity_type", ASCENDING),
+            ("entity_id", ASCENDING),
+            ("version", ASCENDING),
+        ],
+        unique=True,
+        name="unique_decision_audit_version",
+    )
+
+    # Support direct audit retrieval.
+    await database.decision_audits.create_index(
+        [
+            ("audit_id", ASCENDING),
+        ],
+        unique=True,
+        name="unique_decision_audit_id",
+    )
+
+    # Ensure each cryptographic chain fingerprint is unique.
+    await database.decision_audits.create_index(
+        [
+            ("chain_hash", ASCENDING),
+        ],
+        unique=True,
+        name="unique_decision_chain_hash",
+    )
+
+    # Support workspace-level approval audit timelines.
+    await database.decision_audits.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("approved_at", DESCENDING),
+        ],
+        name="decision_audit_workspace_timeline",
+    )
