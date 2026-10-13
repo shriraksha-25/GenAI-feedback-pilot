@@ -292,3 +292,181 @@ async def create_indexes(database: Any) -> None:
         ],
         name="workflow_feature_history",
     )
+
+    # ---------------------------------------------------------
+    # Milestone 4: Versioned product roadmaps
+    # ---------------------------------------------------------
+
+    await database.roadmaps.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("roadmap_id", ASCENDING),
+            ("version", ASCENDING),
+        ],
+        unique=True,
+        name="unique_workspace_roadmap_version",
+    )
+
+    await database.roadmaps.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("roadmap_id", ASCENDING),
+            ("is_current", ASCENDING),
+        ],
+        unique=True,
+        partialFilterExpression={"is_current": True},
+        name="unique_current_workspace_roadmap",
+    )
+
+    await database.roadmaps.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("review_status", ASCENDING),
+            ("created_at", DESCENDING),
+        ],
+        name="roadmap_workspace_status_date",
+    )
+
+    await database.roadmaps.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("milestones.feature_items.feature_id", ASCENDING),
+        ],
+        name="roadmap_workspace_feature",
+    )
+
+    await database.roadmaps.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("source_feedback_ids", ASCENDING),
+        ],
+        name="roadmap_workspace_evidence",
+    )
+
+    # ---------------------------------------------------------
+    # Milestone 4: Executive-summary versions
+    # ---------------------------------------------------------
+
+    await database.executive_summaries.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("summary_id", ASCENDING),
+            ("version", ASCENDING),
+        ],
+        unique=True,
+        name="unique_workspace_summary_version",
+    )
+
+    await database.executive_summaries.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("summary_id", ASCENDING),
+            ("is_current", ASCENDING),
+        ],
+        unique=True,
+        partialFilterExpression={"is_current": True},
+        name="unique_current_workspace_summary",
+    )
+
+    await database.executive_summaries.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("roadmap_id", ASCENDING),
+            ("roadmap_version", DESCENDING),
+        ],
+        name="summary_workspace_roadmap",
+    )
+
+    await database.executive_summaries.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("review_status", ASCENDING),
+            ("created_at", DESCENDING),
+        ],
+        name="summary_workspace_status_date",
+    )
+
+    # ---------------------------------------------------------
+    # Milestone 4: PDF report metadata
+    # ---------------------------------------------------------
+
+    await database.report_metadata.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("report_id", ASCENDING),
+        ],
+        unique=True,
+        name="unique_workspace_report",
+    )
+
+    await database.report_metadata.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("generation_status", ASCENDING),
+            ("requested_at", DESCENDING),
+        ],
+        name="report_workspace_status_date",
+    )
+
+    await database.report_metadata.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("roadmap_id", ASCENDING),
+            ("roadmap_version", DESCENDING),
+        ],
+        name="report_workspace_roadmap",
+    )
+
+    # ---------------------------------------------------------
+    # Milestone 4: What-if simulations
+    # ---------------------------------------------------------
+
+    await database.roadmap_simulations.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("simulation_id", ASCENDING),
+        ],
+        unique=True,
+        name="unique_workspace_simulation",
+    )
+
+    await database.roadmap_simulations.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("roadmap_id", ASCENDING),
+            ("created_at", DESCENDING),
+        ],
+        name="simulation_workspace_roadmap",
+    )
+
+    # ---------------------------------------------------------
+    # Milestone 4: AI quality and trust evaluations
+    # ---------------------------------------------------------
+
+    await database.ai_quality_evaluations.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("evaluation_id", ASCENDING),
+        ],
+        unique=True,
+        name="unique_workspace_quality_evaluation",
+    )
+
+    await database.ai_quality_evaluations.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("entity_type", ASCENDING),
+            ("metrics.validation_status", ASCENDING),
+            ("created_at", DESCENDING),
+        ],
+        name="quality_workspace_entity_status",
+    )
+
+    await database.ai_quality_evaluations.create_index(
+        [
+            ("workspace_id", ASCENDING),
+            ("entity_id", ASCENDING),
+            ("entity_version", DESCENDING),
+        ],
+        name="quality_workspace_entity_version",
+    )
