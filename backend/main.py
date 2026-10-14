@@ -10,6 +10,8 @@ from backend.routers.priority import priority_router
 from backend.routers.chat import chat_router
 from backend.routers.auth import auth_router
 from backend.routers.features import router as features_router
+from backend.routers.planning import planning_router
+from database.indexes import create_indexes
 from database.connection import (
     connect_to_mongodb,
     close_mongodb_connection,
@@ -21,7 +23,8 @@ from database.connection import (
 async def lifespan(app: FastAPI):
     try:
         await connect_to_mongodb()
-        print("MongoDB connected to FastAPI")
+        await create_indexes(get_database())
+        print("MongoDB connected and indexes initialized")
     except Exception as error:
         print(f"MongoDB connection unavailable: {error}")
 
@@ -61,7 +64,7 @@ app.include_router(priority_router)
 app.include_router(chat_router)
 app.include_router(auth_router)
 app.include_router(features_router)
-
+app.include_router(planning_router)
 
 @app.get("/")
 def home():
@@ -84,3 +87,12 @@ def health_check():
         "status": "healthy",
         "database_status": database_status,
     }
+from backend.routers.roadmaps import roadmap_router
+
+
+app.include_router(roadmap_router)
+
+
+from backend.routers.executive_summaries import executive_summary_router
+app.include_router(executive_summary_router)
+
