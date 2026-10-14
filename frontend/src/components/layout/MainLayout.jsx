@@ -5,9 +5,17 @@ import Header from './Header';
 
 // Page titles and context descriptions map
 const routeMeta = {
+  '/dashboard': {
+    title: 'Dashboard',
+    description: "Here's what's happening with your customer feedback.",
+  },
   '/': {
     title: 'Dashboard',
     description: "Here's what's happening with your customer feedback.",
+  },
+  '/assistant': {
+    title: 'AI Product Assistant',
+    description: 'Ask questions, query customer voice data, analyze friction points, and generate PRDs with AI.',
   },
   '/feedback': {
     title: 'Customer Feedback',

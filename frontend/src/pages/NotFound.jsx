@@ -23,7 +23,7 @@ export default function NotFound() {
       </p>
 
       <div className="flex items-center gap-3">
-        <Link to="/">
+        <Link to="/dashboard">
           <Button variant="primary" size="md" icon={Home}>
             Return to Dashboard
           </Button>

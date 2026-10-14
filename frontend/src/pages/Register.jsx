@@ -80,16 +80,28 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-canvas flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
+      {/* Return to Landing Page */}
+      <div className="absolute top-6 left-6">
+        <Link
+          to="/"
+          className="text-xs font-semibold text-slate-500 hover:text-emerald-700 flex items-center gap-1.5 transition-colors"
+        >
+          ← Back to Overview
+        </Link>
+      </div>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Subtle Brand Treatment */}
-        <div className="flex items-center justify-center gap-2.5 mb-3">
-          <div className="w-10 h-10 rounded-md bg-emerald-600 flex items-center justify-center text-white shadow-sm">
-            <Compass className="w-5 h-5" />
-          </div>
-          <span className="text-xl font-bold text-slate-900 tracking-tight">
-            FeedbackForge AI
-          </span>
+        <div className="flex items-center justify-center mb-3">
+          <Link to="/" className="flex items-center gap-2.5 hover:opacity-95 transition-opacity">
+            <div className="w-10 h-10 rounded-md bg-emerald-600 flex items-center justify-center text-white shadow-sm">
+              <Compass className="w-5 h-5" />
+            </div>
+            <span className="text-xl font-bold text-slate-900 tracking-tight">
+              FeedbackForge AI
+            </span>
+          </Link>
         </div>
 
         <p className="text-center text-xs text-slate-500 font-medium">

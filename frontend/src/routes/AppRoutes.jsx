@@ -2,7 +2,9 @@ import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import MainLayout from '../components/layout/MainLayout';
+import LandingPage from '../pages/LandingPage';
 import Dashboard from '../pages/Dashboard';
+import Assistant from '../pages/Assistant';
 import CustomerFeedback from '../pages/CustomerFeedback';
 import Insights from '../pages/Insights';
 import Planning from '../pages/Planning';
@@ -49,7 +51,7 @@ function PublicOnlyRoute({ children }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -58,6 +60,10 @@ function PublicOnlyRoute({ children }) {
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* Public Landing Page */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/landing" element={<LandingPage />} />
+
       {/* Public Authentication routes */}
       <Route
         path="/login"
@@ -78,18 +84,18 @@ export default function AppRoutes() {
 
       {/* Protected Workspace routes within MainLayout */}
       <Route
-        path="/"
         element={
           <ProtectedRoute>
             <MainLayout />
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="feedback" element={<CustomerFeedback />} />
-        <Route path="insights" element={<Insights />} />
-        <Route path="planning" element={<Planning />} />
-        <Route path="requirements" element={<Requirements />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/assistant" element={<Assistant />} />
+        <Route path="/feedback" element={<CustomerFeedback />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="/planning" element={<Planning />} />
+        <Route path="/requirements" element={<Requirements />} />
       </Route>
 
       {/* 404 Not Found Route */}
