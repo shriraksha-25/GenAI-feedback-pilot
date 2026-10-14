@@ -1,4 +1,4 @@
-﻿"""PDF report metadata persistence for Milestone 4."""
+"""PDF report metadata persistence for Milestone 4."""
 
 from datetime import datetime, timezone
 from typing import Any

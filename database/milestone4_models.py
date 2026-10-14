@@ -1,4 +1,4 @@
-﻿"""Pydantic models for Milestone 4 roadmap planning."""
+"""Pydantic models for Milestone 4 roadmap planning."""
 
 from datetime import datetime, timezone
 from typing import Literal

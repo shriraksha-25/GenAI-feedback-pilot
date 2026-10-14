@@ -1,4 +1,4 @@
-﻿"""Versioned roadmap persistence for Milestone 4."""
+"""Versioned roadmap persistence for Milestone 4."""
 
 from datetime import datetime, timezone
 from typing import Any

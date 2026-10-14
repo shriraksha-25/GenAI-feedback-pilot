@@ -1,4 +1,4 @@
-﻿"""Realistic Milestone 4 sample data for integration testing."""
+"""Realistic Milestone 4 sample data for integration testing."""
 
 from datetime import datetime, timedelta, timezone
 from typing import Any

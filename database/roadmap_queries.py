@@ -1,4 +1,4 @@
-﻿"""Evidence-linked roadmap and dashboard queries."""
+"""Evidence-linked roadmap and dashboard queries."""
 
 from collections import defaultdict
 from typing import Any

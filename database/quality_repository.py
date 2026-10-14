@@ -1,4 +1,4 @@
-﻿"""AI quality evaluation persistence for Milestone 4."""
+"""AI quality evaluation persistence for Milestone 4."""
 
 from datetime import datetime, timezone
 from typing import Any

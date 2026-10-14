@@ -1,4 +1,4 @@
-﻿"""Verify the complete Milestone 4 database workflow."""
+"""Verify the complete Milestone 4 database workflow."""
 
 import asyncio
 from copy import deepcopy

@@ -1,4 +1,4 @@
-﻿"""What-If Roadmap Simulator persistence."""
+"""What-If Roadmap Simulator persistence."""
 
 from datetime import datetime, timezone
 from typing import Any
