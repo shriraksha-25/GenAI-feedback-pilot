@@ -13,7 +13,6 @@ from database.user_repository import create_user, get_user_by_email
 
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
-
 password_hash = PasswordHash.recommended()
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -42,8 +41,9 @@ def hash_token(token: str) -> str:
 
 
 def public_user(user: dict) -> dict:
-    """Return only fields safe to expose to the frontend."""
+    """Return safe user fields required by the frontend."""
     return {
+        "user_id": str(user["_id"]),
         "name": user["name"],
         "email": user["email"],
         "role": user["role"],
@@ -106,14 +106,15 @@ async def login(request: LoginRequest):
         )
 
     now = datetime.now(timezone.utc)
+
     if request.remember_me:
         expires_at = now + timedelta(days=REMEMBER_ME_DAYS)
     else:
         expires_at = now + timedelta(hours=NORMAL_SESSION_HOURS)
 
     token = secrets.token_urlsafe(32)
-
     db = get_database()
+
     await db[SESSION_COLLECTION].insert_one(
         {
             "token_hash": hash_token(token),

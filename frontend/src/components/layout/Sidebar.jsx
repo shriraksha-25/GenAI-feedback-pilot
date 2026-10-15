@@ -9,11 +9,13 @@ import {
   LogOut,
   X,
   Compass,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'AI Assistant', path: '/assistant', icon: Bot },
   { name: 'Customer Feedback', path: '/feedback', icon: MessageSquareQuote },
   { name: 'AI Insights', path: '/insights', icon: Sparkles },
   { name: 'Planning', path: '/planning', icon: KanbanSquare },
@@ -87,7 +89,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  end={item.path === '/'}
+                  end={item.path === '/dashboard'}
                   onClick={() => {
                     if (window.innerWidth < 1024) onClose();
                   }}

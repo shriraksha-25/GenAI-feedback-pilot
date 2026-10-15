@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { planningService } from '../services/planningService';
 import { insightsService } from '../services/insightsService';
@@ -20,55 +21,38 @@ import {
 export default function Requirements() {
   const [features, setFeatures] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] =
-    useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
-
-  const [selectedFeature, setSelectedFeature] =
-    useState(null);
-
-  const [selectedPRD, setSelectedPRD] =
-    useState(null);
-
-  const [generatedStories, setGeneratedStories] =
-    useState([]);
+  const [selectedFeature, setSelectedFeature] = useState(null);
+  const [selectedPRD, setSelectedPRD] = useState(null);
+  const [generatedStories, setGeneratedStories] = useState([]);
 
   const loadFeatures = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      let data =
-        await planningService.getFeatures();
+      let data = await planningService.getFeatures();
 
       if (data.length === 0) {
-        const insights =
-          await insightsService.getInsights();
-
-        const opportunities =
-          insights.priorityOpportunities || [];
+        const insights = await insightsService.getInsights();
+        const opportunities = insights.priorityOpportunities || [];
 
         for (const opportunity of opportunities) {
-          if (!opportunity.title) {
-            continue;
-          }
+          if (!opportunity.title) continue;
 
           try {
             await planningService.createFeature({
               title: opportunity.title,
-              description:
-                opportunity.description || '',
-              theme:
-                opportunity.theme || null,
-              pain_point:
-                opportunity.pain_point || null,
+              description: opportunity.description || '',
+              theme: opportunity.theme || null,
+              pain_point: opportunity.pain_point || null,
               feature_category:
                 opportunity.feature_category ||
                 opportunity.recommendedAction ||
                 null,
               source_feedback_ids:
-                opportunity.source_feedback_ids ||
-                [],
+                opportunity.source_feedback_ids || [],
               created_by: 'frontend',
             });
           } catch (createError) {
@@ -79,17 +63,12 @@ export default function Requirements() {
           }
         }
 
-        data =
-          await planningService.getFeatures();
+        data = await planningService.getFeatures();
       }
 
       setFeatures(data);
     } catch (err) {
-      console.error(
-        'Requirements load error:',
-        err
-      );
-
+      console.error('Requirements load error:', err);
       setError(
         err?.response?.data?.detail ||
           err?.message ||
@@ -110,19 +89,14 @@ export default function Requirements() {
     setGeneratedStories([]);
 
     try {
-      const prd =
-        await planningService.generatePRD(
-          feature.feature_id
-        );
+      const prd = await planningService.generatePRD(
+        feature.feature_id
+      );
 
       setSelectedFeature(feature);
       setSelectedPRD(prd);
     } catch (err) {
-      console.error(
-        'PRD generation error:',
-        err
-      );
-
+      console.error('PRD generation error:', err);
       setError(
         err?.response?.data?.detail ||
           err?.message ||
@@ -133,11 +107,48 @@ export default function Requirements() {
     }
   };
 
-  const handleGenerateStories = async () => {
+  // Supports an array, a wrapped array, or one story object.
+  const normalizeStories = (result) => {
+    if (Array.isArray(result)) {
+      return result;
+    }
+
+    if (!result || typeof result !== 'object') {
+      return [];
+    }
+
+    if (Array.isArray(result.user_stories)) {
+      return result.user_stories;
+    }
+
+    if (Array.isArray(result.stories)) {
+      return result.stories;
+    }
+
+    if (Array.isArray(result.items)) {
+      return result.items;
+    }
+
+    if (Array.isArray(result.data)) {
+      return result.data;
+    }
+
+    // The current API can return one saved story directly.
     if (
-      !selectedFeature ||
-      !selectedPRD
+      result.user_story_id ||
+      result.title ||
+      result.user_story ||
+      result.need ||
+      result.persona
     ) {
+      return [result];
+    }
+
+    return [];
+  };
+
+  const handleGenerateStories = async () => {
+    if (!selectedFeature || !selectedPRD) {
       return;
     }
 
@@ -145,65 +156,27 @@ export default function Requirements() {
     setError(null);
 
     try {
-      /*
-       * The API response contains the newly generated
-       * user stories. Keep that response directly in
-       * the UI instead of expecting the PRD endpoint
-       * to contain the stories.
-       */
-      const result =
-        await planningService.generateUserStories(
-          selectedFeature.feature_id,
-          selectedPRD.prd_id
-        );
-
-      console.log(
-        'Generated user stories:',
-        result
+      const result = await planningService.generateUserStories(
+        selectedFeature.feature_id,
+        selectedPRD.prd_id
       );
 
-      /*
-       * Support the possible response shapes:
-       *
-       * [...]
-       * { user_stories: [...] }
-       * { stories: [...] }
-       * { items: [...] }
-       */
-      let stories = [];
+      console.log('Generated user stories:', result);
 
-      if (Array.isArray(result)) {
-        stories = result;
-      } else if (
-        Array.isArray(result?.user_stories)
-      ) {
-        stories = result.user_stories;
-      } else if (
-        Array.isArray(result?.stories)
-      ) {
-        stories = result.stories;
-      } else if (
-        Array.isArray(result?.items)
-      ) {
-        stories = result.items;
-      }
-
+      const stories = normalizeStories(result);
       setGeneratedStories(stories);
 
-      /*
-       * Refresh feature status so the table changes
-       * to stories_generated.
-       */
-      const refreshedFeatures =
-        await planningService.getFeatures();
-
+      // Refresh the feature status after successful generation.
+      const refreshedFeatures = await planningService.getFeatures();
       setFeatures(refreshedFeatures);
-    } catch (err) {
-      console.error(
-        'User story generation error:',
-        err
-      );
 
+      if (stories.length === 0) {
+        setError(
+          'The API did not return a recognizable user-story object. Check the browser console for details.'
+        );
+      }
+    } catch (err) {
+      console.error('User story generation error:', err);
       setError(
         err?.response?.data?.detail ||
           err?.message ||
@@ -221,10 +194,7 @@ export default function Requirements() {
   };
 
   const renderValue = (value) => {
-    if (
-      value === null ||
-      value === undefined
-    ) {
+    if (value === null || value === undefined) {
       return '';
     }
 
@@ -237,23 +207,14 @@ export default function Requirements() {
     }
 
     try {
-      return JSON.stringify(
-        value,
-        null,
-        2
-      );
+      return JSON.stringify(value, null, 2);
     } catch {
       return String(value);
     }
   };
 
-  const getStoryTitle = (
-    story,
-    index
-  ) => {
-    if (
-      typeof story === 'string'
-    ) {
+  const getStoryTitle = (story, index) => {
+    if (typeof story === 'string') {
       return story;
     }
 
@@ -265,20 +226,15 @@ export default function Requirements() {
     );
   };
 
-  const getStoryDescription = (
-    story
-  ) => {
-    if (
-      !story ||
-      typeof story === 'string'
-    ) {
+  const getStoryDescription = (story) => {
+    if (!story || typeof story === 'string') {
       return null;
     }
 
     return (
       story.description ||
       story.story ||
-      story.acceptance_criteria ||
+      story.need ||
       story.details ||
       null
     );
@@ -294,9 +250,7 @@ export default function Requirements() {
           </h1>
 
           <p className="text-sm text-slate-500 mt-0.5">
-            Convert prioritized feature
-            opportunities into PRDs and user
-            stories.
+            Convert prioritized feature opportunities into PRDs and user stories.
           </p>
         </div>
 
@@ -320,12 +274,9 @@ export default function Requirements() {
         />
       )}
 
-      {/* Features */}
+      {/* Feature opportunities */}
       {isLoading ? (
-        <TableSkeleton
-          rows={5}
-          cols={5}
-        />
+        <TableSkeleton rows={5} cols={5} />
       ) : features.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -340,8 +291,7 @@ export default function Requirements() {
             </h2>
 
             <p className="text-xs text-slate-500 mt-1">
-              AI-generated opportunities from
-              customer feedback. Generate a PRD
+              AI-generated opportunities from customer feedback. Generate a PRD
               and then create user stories.
             </p>
           </div>
@@ -350,303 +300,301 @@ export default function Requirements() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                  <th className="px-5 py-3">
-                    Feature
-                  </th>
-
-                  <th className="px-4 py-3">
-                    Theme
-                  </th>
-
-                  <th className="px-4 py-3">
-                    Category
-                  </th>
-
-                  <th className="px-4 py-3">
-                    Status
-                  </th>
-
-                  <th className="px-4 py-3 text-right">
-                    Action
-                  </th>
+                  <th className="px-5 py-3">Feature</th>
+                  <th className="px-4 py-3">Theme</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100 text-xs">
-                {features.map(
-                  (feature) => (
-                    <tr
-                      key={
-                        feature.feature_id
-                      }
-                      className="hover:bg-slate-50/60"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-slate-900">
-                          {feature.title ||
-                            'Untitled Feature'}
+                {features.map((feature) => (
+                  <tr
+                    key={feature.feature_id}
+                    className="hover:bg-slate-50/60"
+                  >
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-slate-900">
+                        {feature.title || 'Untitled Feature'}
+                      </div>
+
+                      {feature.description && (
+                        <div className="text-[11px] text-slate-500 mt-1 max-w-md">
+                          {feature.description}
                         </div>
+                      )}
+                    </td>
 
-                        {feature.description && (
-                          <div className="text-[11px] text-slate-500 mt-1 max-w-md">
-                            {
-                              feature.description
-                            }
-                          </div>
-                        )}
-                      </td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {feature.theme || '—'}
+                    </td>
 
-                      <td className="px-4 py-4 text-slate-600">
-                        {feature.theme ||
-                          '—'}
-                      </td>
+                    <td className="px-4 py-4 text-slate-600">
+                      {feature.feature_category || '—'}
+                    </td>
 
-                      <td className="px-4 py-4 text-slate-600">
-                        {feature.feature_category ||
-                          '—'}
-                      </td>
+                    <td className="px-4 py-4">
+                      <StatusBadge
+                        status={feature.status || 'identified'}
+                      />
+                    </td>
 
-                      <td className="px-4 py-4">
-                        <StatusBadge
-                          status={
-                            feature.status ||
-                            'identified'
-                          }
-                        />
-                      </td>
-
-                      <td className="px-4 py-4 text-right">
-                        <Button
-                          variant="ai"
-                          size="sm"
-                          icon={Sparkles}
-                          onClick={() =>
-                            handleGeneratePRD(
-                              feature
-                            )
-                          }
-                          disabled={
-                            isGenerating
-                          }
-                          isLoading={
-                            isGenerating &&
-                            selectedFeature?.feature_id ===
-                              feature.feature_id
-                          }
-                          loadingText="Generating..."
-                        >
-                          Generate PRD
-                        </Button>
-                      </td>
-                    </tr>
-                  )
-                )}
+                    <td className="px-4 py-4 text-right">
+                      <Button
+                        variant="ai"
+                        size="sm"
+                        icon={Sparkles}
+                        onClick={() => handleGeneratePRD(feature)}
+                        disabled={isGenerating}
+                        isLoading={
+                          isGenerating &&
+                          selectedFeature?.feature_id === feature.feature_id
+                        }
+                        loadingText="Generating..."
+                      >
+                        Generate PRD
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* PRD + Stories Modal */}
-      {selectedFeature &&
-        selectedPRD && (
-          <Modal
-            isOpen={Boolean(
-              selectedPRD
-            )}
-            onClose={
-              closePRDModal
-            }
-            title={
-              typeof selectedPRD.title ===
-              'string'
-                ? selectedPRD.title
-                : 'Generated Product Requirements Document'
-            }
-            subtitle={`Feature: ${selectedFeature.title}`}
-            footer={
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={
-                    closePRDModal
-                  }
-                >
-                  Close
-                </Button>
+      {/* PRD and user-stories modal */}
+      {selectedFeature && selectedPRD && (
+        <Modal
+          isOpen={Boolean(selectedPRD)}
+          onClose={closePRDModal}
+          title={
+            typeof selectedPRD.title === 'string'
+              ? selectedPRD.title
+              : 'Generated Product Requirements Document'
+          }
+          subtitle={`Feature: ${selectedFeature.title}`}
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={closePRDModal}
+              >
+                Close
+              </Button>
 
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={BookOpen}
-                  onClick={
-                    handleGenerateStories
-                  }
-                  disabled={
-                    isGenerating
-                  }
-                  isLoading={
-                    isGenerating
-                  }
-                  loadingText="Generating Stories..."
-                >
-                  Generate User Stories
-                </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={BookOpen}
+                onClick={handleGenerateStories}
+                disabled={isGenerating}
+                isLoading={isGenerating}
+                loadingText="Generating Stories..."
+              >
+                Generate User Stories
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-5 text-xs">
+            {/* PRD */}
+            <div>
+              <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">
+                Product Requirement Document
+              </span>
+
+              <div className="mt-2 p-4 rounded-lg bg-slate-50 border border-slate-200 whitespace-pre-wrap text-slate-800 leading-relaxed overflow-auto max-h-[400px]">
+                {renderValue(selectedPRD.content)}
               </div>
-            }
-          >
-            <div className="space-y-5 text-xs">
-              {/* PRD */}
+            </div>
+
+            {/* PRD ID and status */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg border border-slate-200 bg-white">
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  PRD ID
+                </div>
+
+                <div className="mt-1 font-medium text-slate-700 break-all">
+                  {selectedPRD.prd_id || '—'}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border border-slate-200 bg-white">
+                <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                  Status
+                </div>
+
+                <div className="mt-1">
+                  <StatusBadge status={selectedPRD.status || 'draft'} />
+                </div>
+              </div>
+            </div>
+
+            {/* Generated user stories */}
+            {generatedStories.length > 0 && (
               <div>
-                <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">
-                  Product Requirement
-                  Document
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">
+                    Generated User Stories
+                  </span>
 
-                <div className="mt-2 p-4 rounded-lg bg-slate-50 border border-slate-200 whitespace-pre-wrap text-slate-800 leading-relaxed overflow-auto max-h-[400px]">
-                  {renderValue(
-                    selectedPRD.content
-                  )}
-                </div>
-              </div>
-
-              {/* PRD ID + Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg border border-slate-200 bg-white">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    PRD ID
-                  </div>
-
-                  <div className="mt-1 font-medium text-slate-700 break-all">
-                    {selectedPRD.prd_id ||
-                      '—'}
-                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    {generatedStories.length}{' '}
+                    {generatedStories.length === 1 ? 'story' : 'stories'}
+                  </span>
                 </div>
 
-                <div className="p-3 rounded-lg border border-slate-200 bg-white">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    Status
-                  </div>
+                <div className="mt-2 space-y-3">
+                  {generatedStories.map((story, index) => {
+                    const title = getStoryTitle(story, index);
+                    const description = getStoryDescription(story);
+                    const criteria = story?.acceptance_criteria;
 
-                  <div className="mt-1">
-                    <StatusBadge
-                      status={
-                        selectedPRD.status ||
-                        'draft'
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+                    return (
+                      <div
+                        key={story?.user_story_id || story?.id || index}
+                        className="p-4 rounded-lg bg-white border border-slate-200"
+                      >
+                        <div className="flex items-start gap-3">
+                          <CheckSquare className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
 
-              {/* Generated User Stories */}
-              {generatedStories.length >
-                0 && (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-500 uppercase tracking-wider text-[11px]">
-                      Generated User
-                      Stories
-                    </span>
+                          <div className="min-w-0 flex-1 space-y-3">
+                            <div className="font-semibold text-slate-800">
+                              {title}
+                            </div>
 
-                    <span className="text-[11px] text-slate-400">
-                      {
-                        generatedStories.length
-                      }{' '}
-                      stories
-                    </span>
-                  </div>
-
-                  <div className="mt-2 space-y-3">
-                    {generatedStories.map(
-                      (
-                        story,
-                        index
-                      ) => {
-                        const title =
-                          getStoryTitle(
-                            story,
-                            index
-                          );
-
-                        const description =
-                          getStoryDescription(
-                            story
-                          );
-
-                        return (
-                          <div
-                            key={
-                              story?.user_story_id ||
-                              story?.id ||
-                              index
-                            }
-                            className="p-4 rounded-lg bg-white border border-slate-200"
-                          >
-                            <div className="flex items-start gap-3">
-                              <CheckSquare className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-
-                              <div className="min-w-0 flex-1">
-                                <div className="font-semibold text-slate-800">
-                                  {title}
+                            {story?.persona && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                                  Persona
                                 </div>
 
-                                {description && (
-                                  <div className="text-slate-600 mt-2 leading-relaxed whitespace-pre-wrap">
-                                    {renderValue(
-                                      description
-                                    )}
+                                <div className="mt-1 text-slate-600">
+                                  {renderValue(story.persona)}
+                                </div>
+                              </div>
+                            )}
+
+                            {description && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                                  User Need
+                                </div>
+
+                                <div className="mt-1 text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                  {renderValue(description)}
+                                </div>
+                              </div>
+                            )}
+
+                            {story?.value && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                                  User Value
+                                </div>
+
+                                <div className="mt-1 text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                  {renderValue(story.value)}
+                                </div>
+                              </div>
+                            )}
+
+                            {criteria && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
+                                  Acceptance Criteria
+                                </div>
+
+                                {Array.isArray(criteria) ? (
+                                  <ol className="mt-2 space-y-2 list-decimal pl-4 text-slate-600">
+                                    {criteria.map((criterion, criterionIndex) => (
+                                      <li
+                                        key={
+                                          criterion?.criterion_id ||
+                                          criterion?.id ||
+                                          criterionIndex
+                                        }
+                                        className="leading-relaxed"
+                                      >
+                                        {typeof criterion === 'string' ? (
+                                          criterion
+                                        ) : (
+                                          <div className="space-y-1">
+                                            {criterion?.title && (
+                                              <div className="font-medium text-slate-700">
+                                                {criterion.title}
+                                              </div>
+                                            )}
+
+                                            {criterion?.given && (
+                                              <div>
+                                                <span className="font-medium">
+                                                  Given:{' '}
+                                                </span>
+                                                {criterion.given}
+                                              </div>
+                                            )}
+
+                                            {criterion?.when && (
+                                              <div>
+                                                <span className="font-medium">
+                                                  When:{' '}
+                                                </span>
+                                                {criterion.when}
+                                              </div>
+                                            )}
+
+                                            {criterion?.then && (
+                                              <div>
+                                                <span className="font-medium">
+                                                  Then:{' '}
+                                                </span>
+                                                {criterion.then}
+                                              </div>
+                                            )}
+
+                                            {!criterion?.given &&
+                                              !criterion?.when &&
+                                              !criterion?.then &&
+                                              !criterion?.title &&
+                                              renderValue(criterion)}
+                                          </div>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                ) : (
+                                  <div className="mt-1 text-slate-600 whitespace-pre-wrap">
+                                    {renderValue(criteria)}
                                   </div>
                                 )}
-
-                                {story?.acceptance_criteria &&
-                                  description !==
-                                    story.acceptance_criteria && (
-                                    <div className="mt-3">
-                                      <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
-                                        Acceptance Criteria
-                                      </div>
-
-                                      <div className="mt-1 text-slate-600 whitespace-pre-wrap">
-                                        {renderValue(
-                                          story.acceptance_criteria
-                                        )}
-                                      </div>
-                                    </div>
-                                  )}
                               </div>
-                            </div>
+                            )}
                           </div>
-                        );
-                      }
-                    )}
-                  </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* No stories returned */}
-              {generatedStories.length ===
-                0 && (
-                <div className="p-4 rounded-lg border border-dashed border-slate-300 text-center">
-                  <BookOpen className="w-5 h-5 mx-auto text-slate-400" />
+            {generatedStories.length === 0 && (
+              <div className="p-4 rounded-lg border border-dashed border-slate-300 text-center">
+                <BookOpen className="w-5 h-5 mx-auto text-slate-400" />
 
-                  <p className="text-xs text-slate-500 mt-2">
-                    User stories have been
-                    generated and the feature
-                    status is updated.
-                  </p>
-
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    No story objects were
-                    returned by the API response
-                    to display in this modal.
-                  </p>
-                </div>
-              )}
-            </div>
-          </Modal>
-        )}
+                <p className="text-xs text-slate-500 mt-2">
+                  Generate user stories to display them here.
+                </p>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
