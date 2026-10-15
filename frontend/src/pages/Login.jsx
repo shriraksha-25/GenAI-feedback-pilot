@@ -58,7 +58,7 @@ export default function Login() {
 
     try {
       await login(formData);
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setServerError(err.message || 'Unable to sign in. Please verify your credentials.');
     } finally {
