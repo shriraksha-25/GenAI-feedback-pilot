@@ -1,8 +1,7 @@
-
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.routers.auth import get_current_user
 from database.milestone4_models import (
@@ -28,6 +27,11 @@ class ExecutiveSummaryReviewRequest(BaseModel):
     status: RoadmapStatus
 
 
+class GenerateExecutiveSummaryRequest(BaseModel):
+    workspace_id: str = Field(min_length=1)
+    roadmap_id: str = Field(min_length=1)
+
+
 def clean_document(value: Any) -> Any:
     """Remove MongoDB internal IDs from API responses."""
     if isinstance(value, dict):
@@ -36,8 +40,10 @@ def clean_document(value: Any) -> Any:
             for key, item in value.items()
             if key != "_id"
         }
+
     if isinstance(value, list):
         return [clean_document(item) for item in value]
+
     return value
 
 
@@ -53,6 +59,99 @@ async def create_executive_summary(
         raise HTTPException(
             status_code=400,
             detail=str(error),
+        ) from error
+
+
+@executive_summary_router.post("/generate")
+async def generate_ai_executive_summary(
+    request: GenerateExecutiveSummaryRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    from ai.services.executive_summary_generator import (
+        generate_executive_summary,
+    )
+    from database.feature_repository import list_features
+    from database.feedback_repository import get_analyzed_feedback
+    from database.roadmap_repository import get_current_roadmap
+
+    try:
+        roadmap = await get_current_roadmap(
+            workspace_id=request.workspace_id,
+            roadmap_id=request.roadmap_id,
+        )
+
+        if roadmap is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Current roadmap not found.",
+            )
+
+        features = await list_features(
+            workspace_id=request.workspace_id,
+            limit=100,
+        )
+
+        feedback = await get_analyzed_feedback(
+            workspace_id=request.workspace_id,
+            limit=100,
+        )
+
+        # CrewAI generation is async; await it inside this async route.
+        result = await generate_executive_summary(
+            roadmap,
+            features=features,
+            feedback=feedback,
+            workspace_id=request.workspace_id,
+            roadmap_id=request.roadmap_id,
+        )
+
+        if not isinstance(result, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Executive summary generator returned an invalid result.",
+            )
+
+        if result.get("status") != "completed":
+            status = result.get("status", "failed")
+            error_detail = (
+                result.get("error")
+                or result.get("message")
+                or f"Executive summary generation status: {status}"
+            )
+            status_code = 503 if status == "not_configured" else 500
+
+            raise HTTPException(
+                status_code=status_code,
+                detail=str(error_detail),
+            )
+
+        summary = result.get("summary")
+
+        if not isinstance(summary, dict):
+            raise HTTPException(
+                status_code=500,
+                detail="Generated executive summary is missing.",
+            )
+
+        summary = dict(summary)
+        summary["workspace_id"] = request.workspace_id
+        summary["roadmap_id"] = request.roadmap_id
+        summary["roadmap_version"] = roadmap.get("version", 1)
+
+        saved_summary = await save_executive_summary_version(summary)
+        return clean_document(saved_summary)
+
+    except HTTPException:
+        raise
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Executive summary generation failed: {error}",
         ) from error
 
 

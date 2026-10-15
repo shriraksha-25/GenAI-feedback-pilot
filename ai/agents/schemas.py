@@ -218,3 +218,22 @@ class AssistantResponse(BaseModel):
     grounded: bool = Field(..., description="True if the answer is based on the supplied context; False if the question could not be answered from the given context (in which case `answer` should say so plainly rather than guessing).")
     referenced_feedback_ids: list[str] = Field(default_factory=list, description="feedback_ids from the supplied context that the answer actually draws on, if any were supplied and used.")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Model's confidence in this answer, from 0.0 to 1.0.")
+
+
+# =======================================================================
+# MILESTONE 4 — Roadmap / Executive Summary
+# =======================================================================
+class ExecutiveSummaryResult(BaseModel):
+    """Structured, evidence-grounded executive summary for a roadmap."""
+
+    overview: str = Field(..., description="Concise executive overview based only on supplied roadmap and product evidence.")
+    customer_pain_points: list[str] = Field(default_factory=list)
+    priority_features: list[str] = Field(default_factory=list)
+    product_opportunities: list[str] = Field(default_factory=list)
+    roadmap_highlights: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    expected_outcomes: list[str] = Field(default_factory=list)
+    source_feedback_ids: list[str] = Field(default_factory=list, description="Only feedback IDs explicitly supplied in context and used as evidence.")
+    source_feature_ids: list[str] = Field(default_factory=list, description="Only feature IDs explicitly supplied in context and used.")

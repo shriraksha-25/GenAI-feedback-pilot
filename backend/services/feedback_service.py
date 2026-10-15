@@ -1,3 +1,4 @@
+
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional
@@ -15,6 +16,7 @@ async def process_feedback(
     customer_segment: Optional[str] = None,
     product_area: Optional[str] = None,
     language: str = "en",
+    workspace_id: str = "default-workspace",
 ):
     feedback_id = str(uuid4())
 
@@ -47,6 +49,7 @@ async def process_feedback(
 
     feedback_record = StoredFeedbackRecord(
         feedback_id=feedback_id,
+        workspace_id=workspace_id,
         source=source,
         product=product_area,
         description=cleaned_text,

@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -27,6 +28,12 @@ class CustomerFeedback(BaseModel):
     language: str = Field(
         default="en",
         description="Language of the submitted feedback"
+    )
+
+    workspace_id: str = Field(
+        default="default-workspace",
+        min_length=1,
+        description="Workspace that owns this feedback"
     )
 
 

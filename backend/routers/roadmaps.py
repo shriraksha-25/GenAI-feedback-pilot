@@ -1,7 +1,7 @@
-from typing import Any
+﻿from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.routers.auth import get_current_user
 from database.milestone4_models import RoadmapStatus, RoadmapVersionRecord
@@ -19,6 +19,14 @@ roadmap_router = APIRouter(prefix="/roadmaps", tags=["Roadmap Planning"])
 
 class RoadmapReviewRequest(BaseModel):
     status: RoadmapStatus
+
+
+class GenerateRoadmapRequest(BaseModel):
+    workspace_id: str = Field(default="default", min_length=1)
+    title: str = Field(default="AI-Generated Product Roadmap", min_length=1)
+    milestone_days: int = Field(default=30, ge=1, le=365)
+    capacity_per_milestone: float = Field(default=40, gt=0)
+    max_milestones: int = Field(default=4, ge=1, le=12)
 
 
 def clean_document(value: Any) -> Any:
@@ -43,6 +51,77 @@ async def create_roadmap(
         return clean_document(result)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@roadmap_router.post("/generate")
+async def generate_ai_roadmap(
+    request: GenerateRoadmapRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    from ai.services.roadmap_planner import generate_roadmap
+    from database.feature_repository import list_features
+    from database.feedback_repository import get_analyzed_feedback
+    from database.priority_repository import get_workspace_priority_ranking
+
+    try:
+        features = await list_features(
+            workspace_id=request.workspace_id,
+            limit=100,
+        )
+
+        if not features:
+            raise HTTPException(
+                status_code=404,
+                detail="No features found for this workspace.",
+            )
+
+        # Existing feature records may not contain an effort estimate.
+        # Use a clearly marked placeholder so the planner can schedule them.
+        for feature in features:
+            effort = feature.get("estimated_effort")
+            if effort is None or effort <= 0:
+                effort = feature.get("effort")
+            if effort is None or effort <= 0:
+                effort = 1.0
+
+            feature["estimated_effort"] = effort
+
+        feedback = await get_analyzed_feedback(
+            workspace_id=request.workspace_id,
+            limit=100,
+        )
+
+        priority_scores = await get_workspace_priority_ranking(
+            workspace_id=request.workspace_id,
+            limit=100,
+        )
+
+        roadmap = await generate_roadmap(
+            features,
+            feedback=feedback,
+            priority_scores=priority_scores,
+            workspace_id=request.workspace_id,
+            title=request.title,
+            milestone_days=request.milestone_days,
+            capacity_per_milestone=request.capacity_per_milestone,
+            max_milestones=request.max_milestones,
+        )
+
+        saved_roadmap = await save_roadmap_version(roadmap)
+        return clean_document(saved_roadmap)
+
+    except HTTPException:
+        raise
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI roadmap generation failed: {error}",
+        ) from error
 
 
 @roadmap_router.get("")
@@ -81,11 +160,22 @@ async def roadmap_version(
     current_user: dict = Depends(get_current_user),
 ):
     if version < 1:
-        raise HTTPException(status_code=400, detail="Version must be 1 or greater.")
+        raise HTTPException(
+            status_code=400,
+            detail="Version must be 1 or greater.",
+        )
 
-    result = await get_roadmap_version(workspace_id, roadmap_id, version)
+    result = await get_roadmap_version(
+        workspace_id,
+        roadmap_id,
+        version,
+    )
+
     if result is None:
-        raise HTTPException(status_code=404, detail="Roadmap version not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Roadmap version not found.",
+        )
 
     return clean_document(result)
 
@@ -96,9 +186,16 @@ async def current_roadmap(
     workspace_id: str = Query(..., min_length=1),
     current_user: dict = Depends(get_current_user),
 ):
-    result = await get_current_roadmap(workspace_id, roadmap_id)
+    result = await get_current_roadmap(
+        workspace_id,
+        roadmap_id,
+    )
+
     if result is None:
-        raise HTTPException(status_code=404, detail="Current roadmap not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Current roadmap not found.",
+        )
 
     return clean_document(result)
 
@@ -116,7 +213,12 @@ async def review_roadmap(
         status=request.status,
         reviewed_by=current_user.get("email", "unknown"),
     )
+
     if result is None:
-        raise HTTPException(status_code=404, detail="Current roadmap not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Current roadmap not found.",
+        )
 
     return clean_document(result)
+

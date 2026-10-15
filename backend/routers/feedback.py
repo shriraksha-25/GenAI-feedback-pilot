@@ -1,3 +1,4 @@
+
 import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
@@ -6,13 +7,11 @@ from backend.schemas.feedback import CustomerFeedback, FeedbackResponse
 from backend.services.feedback_service import process_feedback
 
 from database.connection import get_database
-from database.feedback_repository import (
-    get_analyzed_feedback,
-    save_feedback_analysis,
-)
+from database.feedback_repository import get_analyzed_feedback
 from database.models import AIAnalysis
 
 from ai.services.feedback_analyzer import analyze_feedback
+from database.feedback_repository import save_feedback_analysis
 
 
 feedback_router = APIRouter(
@@ -38,6 +37,7 @@ async def receive_feedback(feedback: CustomerFeedback):
         customer_segment=feedback.customer_segment,
         product_area=feedback.product_area,
         language=feedback.language,
+        workspace_id=feedback.workspace_id,
     )
 
     if result["status"] == "rejected":
@@ -101,19 +101,12 @@ async def analyze_all_feedback():
                 failed_count += 1
                 continue
 
-            # ---------------------------------------------------------
-            # Skip records that are already successfully analyzed.
-            # This prevents unnecessary Gemini API calls and
-            # helps avoid free-tier rate-limit errors.
-            # ---------------------------------------------------------
             existing_analysis = record.get("ai_analysis") or {}
 
             if existing_analysis.get("ai_status") == "completed":
                 skipped_count += 1
                 continue
 
-            # Run synchronous CrewAI analysis outside
-            # FastAPI's running event loop.
             result = await asyncio.to_thread(
                 analyze_feedback,
                 text=feedback_text,
@@ -138,12 +131,8 @@ async def analyze_all_feedback():
                 ai_error=result.get("ai_error"),
             )
 
-            await save_feedback_analysis(
-                feedback_id,
-                ai_analysis,
-            )
+            await save_feedback_analysis(feedback_id, ai_analysis)
 
-            # Count only genuinely completed AI analysis as analyzed.
             if result.get("ai_status") == "completed":
                 analyzed_count += 1
             else:
